@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LST Liquidity Alerts</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c232d; --line: #2a333f;
+    --text: #e6edf3; --muted: #8b98a8; --gold: #e8c547;
+    --buy: #2fbf71; --sell: #ef5350; --warn: #f0a33a; --info: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  h1 { margin: 0; font-size: 20px; font-weight: 600; color: var(--gold); letter-spacing: .3px; }
+  .clock { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .clock b { color: var(--text); }
+  .sess { padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--panel2); border: 1px solid var(--line); }
+  .sess.asia { color: var(--info); } .sess.london, .sess.newyork { color: var(--gold); } .sess.off { color: var(--muted); }
+  .spacer { flex: 1; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--gold); }
+  button.on { border-color: var(--buy); color: var(--buy); }
+  main { padding: 18px 20px 40px; max-width: 1400px; margin: 0 auto; }
+
+  #banner { display: none; position: sticky; top: 0; z-index: 10; padding: 14px 20px; font-size: 17px; font-weight: 600; align-items: center; gap: 16px; }
+  #banner.show { display: flex; }
+  #banner.SELL { background: var(--sell); color: #fff; } #banner.BUY { background: var(--buy); color: #04140b; }
+  #banner .x { margin-left: auto; background: rgba(0,0,0,.25); border: 0; color: inherit; }
+  #banner .lvls { font-weight: 400; font-size: 14px; }
+
+  .grid { display: grid; grid-template-columns: 140px repeat(4, 1fr); gap: 8px; overflow-x: auto; }
+  .gh { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; padding: 4px 6px; }
+  .inst { display: flex; flex-direction: column; justify-content: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .inst b { font-size: 16px; } .inst small { color: var(--muted); font-size: 11px; }
+  .cell { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; min-height: 118px; min-width: 190px; transition: border-color .15s; }
+  .cell:hover { border-color: var(--muted); } .cell.sel { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+  .cell.hot-SELL { background: linear-gradient(0deg, rgba(239,83,80,.12), rgba(239,83,80,.12)), var(--panel); border-color: var(--sell); }
+  .cell.hot-BUY { background: linear-gradient(0deg, rgba(47,191,113,.12), rgba(47,191,113,.12)), var(--panel); border-color: var(--buy); }
+  .row1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .price { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .age { color: var(--muted); font-size: 11px; }
+  .lv { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin: 3px 0 6px; }
+  .st { font-size: 12.5px; margin-top: 3px; display: flex; gap: 6px; align-items: baseline; }
+  .tag { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+  .tag.SELL { background: var(--sell); color: #fff; } .tag.BUY { background: var(--buy); color: #04140b; }
+  .tag.wait { background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
+  .tag.grab { background: var(--warn); color: #1a1000; } .tag.cont { background: var(--info); color: #001428; }
+  .err { color: var(--sell); font-size: 12px; }
+
+  .two { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+  canvas { width: 100%; height: 340px; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; }
+  .detail { font-size: 13px; margin-top: 10px; line-height: 1.7; }
+  .detail b { font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  th { color: var(--muted); font-weight: 500; }
+  .hist { max-height: 420px; overflow: auto; }
+  .settings { margin-top: 18px; font-size: 13px; color: var(--muted); }
+  .settings input { background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 7px 10px; width: 280px; font: inherit; }
+  .settings a { color: var(--info); }
+  .rules { margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .rules summary { cursor: pointer; color: var(--text); }
+  .rules li { margin: 4px 0; }
+  .src { font-size: 11px; color: var(--muted); }
+  @media (max-width: 900px) { .two { grid-template-columns: 1fr; } header { padding: 12px 16px; } main { padding: 14px 16px 40px; } }
+</style>
+</head>
+<body>
+<div id="banner"><span id="bannerText"></span><span class="lvls" id="bannerLv"></span><button class="x" onclick="hideBanner()">Dismiss</button></div>
+<header>
+  <h1>LST · Liquidity Alerts</h1>
+  <span class="clock">New York <b id="nyClock">--:--</b> · Your time <b id="localClock">--:--</b></span>
+  <span class="sess" id="sess">—</span>
+  <span class="spacer"></span>
+  <button id="soundBtn" onclick="toggleSound()">🔇 Sound off: click to enable</button>
+  <button onclick="testAlert()">Test alert</button>
+  <button onclick="refreshAll(true)">Refresh now</button>
+</header>
+<main>
+  <div class="grid" id="grid"></div>
+
+  <div class="two">
+    <div class="card">
+      <h2 id="chartTitle">Chart</h2>
+      <canvas id="chart"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--info);opacity:.5;height:10px"></i>Asia session</span>
+        <span><i style="background:var(--gold)"></i>Asia high / low (liquidity $$$)</span>
+        <span><i style="background:var(--sell)"></i>Stop reference</span>
+        <span><i style="background:var(--buy)"></i>50% partial</span>
+      </div>
+      <div class="detail" id="detail"></div>
+    </div>
+    <div class="card">
+      <h2>Signal history</h2>
+      <div class="hist"><table><thead><tr><th>NY time</th><th>Market</th><th>TF</th><th>Signal</th><th>Entry</th><th>Stop</th><th>50%</th></tr></thead><tbody id="hist"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="card settings">
+    <h2>Data source</h2>
+    <div id="srcInfo"></div>
+    <p>For real Gold and EUR/USD forex prices, paste a free <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener">Twelve Data</a> API key (free plan: 800 requests/day, which is enough for this page).
+      Without a key, the page uses free stand-ins from Binance: <b>PAXG</b> (a gold-backed token) for Gold and <b>EURUSDT</b> for EUR/USD. They track the real price closely but aren't exact.</p>
+    <input id="keyInput" placeholder="Twelve Data API key (optional)" autocomplete="off"> <button onclick="saveKey()">Save key</button> <button onclick="clearKey()">Remove key</button>
+  </div>
+
+  <details class="card rules">
+    <summary><b>Rules this page applies (from the LST PDF)</b></summary>
+    <ol>
+      <li><b>Asia range</b>: the high and low from 7:00 PM to 3:00 AM New York time are the liquidity levels.</li>
+      <li><b>Liquidity grab</b>: between 3:00 AM and 12:00 PM NY (London and New York openings), price trades above the Asia high (looking for a SELL, M pattern) or below the Asia low (looking for a BUY, W pattern).</li>
+      <li><b>Confirmation (Type 2, Manipulation Liquidity)</b>:
+        <b>Model 1</b>: the grab candle closes back inside the range.
+        <b>Model 2</b>: the next candle engulfs the grab candle and closes back inside.
+        <b>Model 3</b>: the third candle engulfs the second and closes back inside.</li>
+      <li><b>Continuation (Type 1)</b>: if none of the 3 models appears and price stays beyond the level, the page labels it "Continuation" and does not alert.</li>
+      <li><b>Management</b>: stop reference = the extreme of the grab. Move to break-even and take partial profits at <b>50%</b> of the move that took the liquidity.</li>
+      <li>Only <b>closed</b> candles are analyzed. One signal per side, per day, per timeframe.</li>
+    </ol>
+    <p>Not included yet (version 2): Fibonacci 0.618 / 0.7 / 0.786 entries and internal liquidity points. This page only sends alerts. It never places trades.</p>
+  </details>
+</main>
+
+<script src="lst-logic.js"></script>
+<script>
+const INSTR = [
+  { id: 'XAU', name: 'Gold', td: 'XAU/USD', bn: 'PAXGUSDT', dp: 2 },
+  { id: 'EUR', name: 'EUR/USD', td: 'EUR/USD', bn: 'EURUSDT', dp: 5 },
+  { id: 'BTC', name: 'Bitcoin', td: null, bn: 'BTCUSDT', dp: 1 },
+];
+const TFS = [
+  { id: '15m', ms: 15 * 60e3, td: '15min', bn: '15m' },
+  { id: '30m', ms: 30 * 60e3, td: '30min', bn: '30m' },
+  { id: '1h', ms: 60 * 60e3, td: '1h', bn: '1h' },
+  { id: '2h', ms: 120 * 60e3, td: '2h', bn: '2h' },
+];
+const ALERT_FRESH = 2;   // alert only if the confirmation candle is among the last 2 closed candles
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('lst.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('lst.' + k, JSON.stringify(v)); } catch {} },
+};
+let apiKey = store.get('key', '');
+let seen = new Set(store.get('seen', []));
+let sigHist = store.get('history', []);
+let soundOn = false, audioCtx = null;
+let selected = 'XAU|15m';
+
+const series = {};   // "XAU|15m" -> {candles, res, nextDue, error, source, loading}
+for (const i of INSTR) for (const t of TFS) series[i.id + '|' + t.id] = { instr: i, tf: t, candles: [], res: [], nextDue: 0, loading: true };
+
+const fmtNY = t => new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+const fmtP = (v, dp) => v == null || isNaN(v) ? '—' : (+v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const useTD = i => apiKey && i.td;
+
+// ---------- data ----------
+async function fetchBinance(sym, tf) {
+  const r = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${tf.bn}&limit=400`);
+  if (!r.ok) throw new Error('Binance HTTP ' + r.status);
+  const a = await r.json(), now = Date.now();
+  return a.filter(k => k[6] < now).map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }));
+}
+async function fetchTD(sym, tf) {
+  const r = await fetch(`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=${tf.td}&outputsize=400&timezone=UTC&order=ASC&apikey=${encodeURIComponent(apiKey)}`);
+  const j = await r.json();
+  if (j.status === 'error' || !j.values) throw new Error('Twelve Data: ' + (j.message || 'no data'));
+  const now = Date.now();
+  return j.values.map(v => ({ t: Date.parse(v.datetime.replace(' ', 'T') + 'Z'), o: +v.open, h: +v.high, l: +v.low, c: +v.close }))
+    .filter(c => c.t + tf.ms <= now);
+}
+
+let tdQueue = [], tdBusy = false;
+function enqueueTD(key) { if (!tdQueue.includes(key)) tdQueue.push(key); pumpTD(); }
+async function pumpTD() {
+  if (tdBusy) return; tdBusy = true;
+  while (tdQueue.length) {
+    await load(tdQueue.shift());
+    if (tdQueue.length) await new Promise(r => setTimeout(r, 9000));   // free plan: max 8 requests/min
+  }
+  tdBusy = false;
+}
+
+async function load(key) {
+  const s = series[key]; const { instr, tf } = s;
+  try {
+    s.source = useTD(instr) ? `Twelve Data ${instr.td}` : `Binance ${instr.bn}`;
+    const c = useTD(instr) ? await fetchTD(instr.td, tf) : await fetchBinance(instr.bn, tf);
+    s.candles = c; s.error = null; s.loading = false; s.fetchedAt = Date.now();
+    s.res = analyze(c, tf.ms);
+    const last = c[c.length - 1];
+    let due = last ? last.t + 2 * tf.ms + 20e3 : Date.now() + 60e3;
+    if (due <= Date.now()) due = Date.now() + Math.min(tf.ms, 15 * 60e3);   // market closed / stale data
+    s.nextDue = due;
+    checkSignals(key);
+  } catch (e) {
+    s.error = e.message; s.loading = false; s.nextDue = Date.now() + 2 * 60e3;
+  }
+  renderCell(key);
+  if (key === selected) renderDetail();
+}
+
+function refreshAll(force) {
+  const now = Date.now();
+  for (const key in series) {
+    const s = series[key];
+    if (!force && s.nextDue > now) continue;
+    s.nextDue = now + 60e3;
+    if (useTD(s.instr)) enqueueTD(key); else load(key);
+  }
+}
+
+// ---------- signals ----------
+function checkSignals(key) {
+  const s = series[key]; const c = s.candles;
+  const lastT = c.length ? c[c.length - 1].t : 0;
+  for (const day of s.res.slice(-4)) {
+    for (const sd of day.sides) {
+      if (sd.state !== 'signal') continue;
+      const id = `${key}|${day.day}|${sd.side}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const rec = { id, t: sd.confT + s.tf.ms, inst: s.instr.name, tf: s.tf.id, dir: sd.dir, model: sd.model, entry: sd.entry, stop: sd.stop, partial: sd.partial, dp: s.instr.dp };
+      sigHist.unshift(rec);
+      const fresh = lastT - sd.confT <= (ALERT_FRESH - 1) * s.tf.ms;
+      if (fresh) fireAlert(rec);
+    }
+  }
+  sigHist.sort((a, b) => b.t - a.t); sigHist = sigHist.slice(0, 80);
+  store.set('seen', [...seen].slice(-500)); store.set('history', sigHist);
+  renderHistory();
+}
+
+function fireAlert(r) {
+  const b = document.getElementById('banner');
+  b.className = 'show ' + r.dir;
+  document.getElementById('bannerText').textContent = `${r.dir} · ${r.inst} ${r.tf} · Model ${r.model} confirmed (candle closed ${fmtNY(r.t)} NY)`;
+  document.getElementById('bannerLv').textContent = `Entry ~${fmtP(r.entry, r.dp)} · Stop ref ${fmtP(r.stop, r.dp)} · 50% partial ${fmtP(r.partial, r.dp)}`;
+  document.title = `🔔 ${r.dir} ${r.inst} ${r.tf}`;
+  beep(r.dir);
+}
+function hideBanner() { document.getElementById('banner').className = ''; document.title = 'LST Liquidity Alerts'; }
+function testAlert() { fireAlert({ dir: 'SELL', inst: 'TEST', tf: '15m', model: 1, t: Date.now(), entry: 0, stop: 0, partial: 0, dp: 2 }); }
+
+function toggleSound() {
+  soundOn = !soundOn;
+  if (soundOn && !audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const b = document.getElementById('soundBtn');
+  b.textContent = soundOn ? '🔊 Sound on' : '🔇 Sound off: click to enable';
+  b.classList.toggle('on', soundOn);
+  if (soundOn) beep('BUY');
+}
+function beep(dir) {
+  if (!soundOn || !audioCtx) return;
+  const notes = dir === 'SELL' ? [880, 660, 494] : [494, 660, 880];
+  notes.forEach((f, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t0 = audioCtx.currentTime + i * 0.22;
+    o.type = 'sine'; o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2);
+    o.start(t0); o.stop(t0 + 0.21);
+  });
+}
+
+// ---------- render ----------
+function statusFor(s) {
+  const today = tradingDay(Date.now());
+  const day = s.res.length ? s.res[s.res.length - 1] : null;
+  if (!day) return [['wait', '—', 'Not enough data yet']];
+  if (day.day !== today) return [['wait', 'CLOSED', 'Market closed / no session data today']];
+  if (!day.asiaDone) return [['wait', 'ASIA', 'Building Asia range…']];
+  return day.sides.map(sd => {
+    const lvl = sd.side === 'sell' ? 'Asia high' : 'Asia low';
+    switch (sd.state) {
+      case 'signal': return [sd.dir, sd.dir + ' M' + sd.model, `Model ${sd.model} confirmed at ${fmtNY(sd.confT + s.tf.ms).split(', ')[1]} NY`];
+      case 'grabbed': return ['grab', 'GRAB', `${lvl} taken: waiting for confirmation`];
+      case 'continuation': return ['cont', 'TYPE 1', `${lvl} broken: continuation, no reversal`];
+      case 'nomodel': return ['wait', 'NO MODEL', `${lvl} taken, no valid model`];
+      default: return ['wait', 'WAIT', `${lvl} not taken yet`];
+    }
+  });
+}
+
+function buildGrid() {
+  const g = document.getElementById('grid');
+  g.innerHTML = '<div></div>' + TFS.map(t => `<div class="gh">${t.id}</div>`).join('');
+  for (const i of INSTR) {
+    g.insertAdjacentHTML('beforeend', `<div class="inst"><b>${i.name}</b><small id="src-${i.id}"></small></div>`);
+    for (const t of TFS) {
+      const key = i.id + '|' + t.id;
+      g.insertAdjacentHTML('beforeend', `<div class="cell" id="c-${key}" onclick="select('${key}')"></div>`);
+    }
+  }
+}
+function renderCell(key) {
+  const s = series[key], el = document.getElementById('c-' + key);
+  el.classList.toggle('sel', key === selected);
+  el.classList.remove('hot-SELL', 'hot-BUY');
+  if (s.loading) { el.innerHTML = '<span class="age">Loading…</span>'; return; }
+  if (s.error) { el.innerHTML = `<div class="err">${s.error}</div><div class="age">Retrying in 2 min</div>`; return; }
+  const last = s.candles[s.candles.length - 1], day = s.res[s.res.length - 1], dp = s.instr.dp;
+  const sts = statusFor(s);
+  const hot = sts.find(x => x[0] === 'SELL' || x[0] === 'BUY');
+  if (hot) el.classList.add('hot-' + hot[0]);
+  el.innerHTML = `
+    <div class="row1"><span class="price">${fmtP(last && last.c, dp)}</span><span class="age">close ${last ? fmtNY(last.t + s.tf.ms).split(', ')[1] : ''}</span></div>
+    <div class="lv">Asia H ${fmtP(day && day.hi, dp)} · L ${fmtP(day && day.lo, dp)}</div>
+    ${sts.map(([cls, tag, txt]) => `<div class="st"><span class="tag ${cls}">${tag}</span><span>${txt}</span></div>`).join('')}`;
+  document.getElementById('src-' + s.instr.id).textContent = s.source || '';
+}
+function renderAll() { for (const k in series) renderCell(k); renderDetail(); renderHistory(); renderSrc(); }
+
+function renderHistory() {
+  document.getElementById('hist').innerHTML = sigHist.length ? sigHist.map(r =>
+    `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.dir} M${r.model}</span></td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td>${fmtP(r.partial, r.dp)}</td></tr>`
+  ).join('') : '<tr><td colspan="7" style="color:var(--muted)">No signals yet.</td></tr>';
+}
+
+function select(key) {
+  const prev = selected; selected = key;
+  renderCell(prev); renderCell(key); renderDetail();
+}
+
+function renderDetail() {
+  const s = series[selected];
+  document.getElementById('chartTitle').textContent = `${s.instr.name} · ${s.tf.id} · ${s.source || ''}`;
+  drawChart(s);
+  const day = s.res[s.res.length - 1], dp = s.instr.dp, d = document.getElementById('detail');
+  if (!day) { d.innerHTML = ''; return; }
+  let html = `<div>Trading day <b>${day.day}</b> · Asia high <b>${fmtP(day.hi, dp)}</b> · Asia low <b>${fmtP(day.lo, dp)}</b></div>`;
+  for (const sd of day.sides) if (sd.state === 'signal')
+    html += `<div><span class="tag ${sd.dir}">${sd.dir} · Model ${sd.model}</span> Entry ~<b>${fmtP(sd.entry, dp)}</b> · Stop ref <b>${fmtP(sd.stop, dp)}</b> · Break-even + partial at 50%: <b>${fmtP(sd.partial, dp)}</b></div>`;
+  d.innerHTML = html;
+}
+
+function drawChart(s) {
+  const cv = document.getElementById('chart'), dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const n = Math.min(s.candles.length, Math.max(40, Math.floor(W / 9)));
+  const cs = s.candles.slice(-n);
+  if (!cs.length) return;
+  const day = s.res[s.res.length - 1];
+  const sig = day ? day.sides.filter(x => x.state === 'signal') : [];
+  const vals = cs.flatMap(c => [c.h, c.l]);
+  if (day) vals.push(day.hi, day.lo); sig.forEach(x => vals.push(x.stop, x.partial));
+  let mx = Math.max(...vals), mn = Math.min(...vals); const pad = (mx - mn) * 0.06 || 1; mx += pad; mn -= pad;
+  const R = 64, cw = (W - R) / n, y = v => (mx - v) / (mx - mn) * (H - 10) + 5, x = i => i * cw + cw / 2;
+  const asiaSet = new Set(day ? day.asiaCandles : []);
+  ctx.fillStyle = 'rgba(88,166,255,.10)';
+  cs.forEach((c, i) => { if (asiaSet.has(c.t)) ctx.fillRect(i * cw, 0, cw + .5, H); });
+  const hline = (v, col, dash, label) => {
+    ctx.strokeStyle = col; ctx.setLineDash(dash); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, y(v)); ctx.lineTo(W - R, y(v)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = col; ctx.font = '11px Segoe UI'; ctx.fillText(label, W - R + 4, y(v) + 4);
+  };
+  if (day) { hline(day.hi, css('--gold'), [6, 4], 'Asia H $$$'); hline(day.lo, css('--gold'), [6, 4], 'Asia L $$$'); }
+  sig.forEach(sd => { hline(sd.stop, css('--sell'), [2, 3], 'Stop'); hline(sd.partial, css('--buy'), [2, 3], '50%'); });
+  const up = css('--buy'), dn = css('--sell');
+  cs.forEach((c, i) => {
+    const col = c.c >= c.o ? up : dn; ctx.strokeStyle = col; ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(x(i), y(c.h)); ctx.lineTo(x(i), y(c.l)); ctx.stroke();
+    const bw = Math.max(1, cw * 0.65), top = y(Math.max(c.o, c.c)), bh = Math.max(1, Math.abs(y(c.o) - y(c.c)));
+    ctx.fillRect(x(i) - bw / 2, top, bw, bh);
+  });
+  sig.forEach(sd => {
+    const i = cs.findIndex(c => c.t === sd.confT); if (i < 0) return;
+    const c = cs[i], sell = sd.dir === 'SELL', yy = sell ? y(c.h) - 10 : y(c.l) + 10;
+    ctx.fillStyle = sell ? dn : up; ctx.beginPath();
+    if (sell) { ctx.moveTo(x(i), yy + 6); ctx.lineTo(x(i) - 6, yy - 4); ctx.lineTo(x(i) + 6, yy - 4); }
+    else { ctx.moveTo(x(i), yy - 6); ctx.lineTo(x(i) - 6, yy + 4); ctx.lineTo(x(i) + 6, yy + 4); }
+    ctx.fill(); ctx.font = 'bold 11px Segoe UI'; ctx.fillText('M' + sd.model, x(i) + 8, yy + 4);
+  });
+}
+
+function renderSrc() {
+  document.getElementById('srcInfo').innerHTML = apiKey
+    ? '✅ Using <b>Twelve Data</b> for Gold and EUR/USD (real forex prices). Bitcoin always comes from Binance.'
+    : 'ℹ️ No API key saved. Using <b>free Binance stand-ins</b> (PAXG for Gold, EURUSDT for EUR/USD).';
+  document.getElementById('keyInput').value = apiKey ? '••••••••' + apiKey.slice(-4) : '';
+}
+function resetSeries() {
+  for (const k in series) Object.assign(series[k], { candles: [], res: [], loading: true, error: null, nextDue: 0 });
+  tdQueue = []; renderAll(); refreshAll(true);
+}
+function saveKey() { const v = document.getElementById('keyInput').value.trim(); if (!v || v.startsWith('••')) return; apiKey = v; store.set('key', v); resetSeries(); }
+function clearKey() { apiKey = ''; store.set('key', ''); resetSeries(); }
+
+function tickClock() {
+  const now = Date.now();
+  document.getElementById('nyClock').textContent = new Date(now).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false });
+  document.getElementById('localClock').textContent = new Date(now).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const s = sessionOf(now), el = document.getElementById('sess');
+  el.className = 'sess ' + s;
+  el.textContent = { asia: 'Asia: building range', london: 'London: liquidity hunt', newyork: 'New York: liquidity hunt', off: 'Outside hunt window' }[s];
+}
+
+buildGrid(); renderAll(); tickClock();
+refreshAll(true);
+setInterval(tickClock, 15e3);
+setInterval(() => refreshAll(false), 20e3);
+window.addEventListener('resize', () => drawChart(series[selected]));
+</script>
+</body>
+</html>
