@@ -143,7 +143,6 @@ const TFS = [
   { id: '2h', ms: 120 * 60e3, td: '2h', bn: '2h' },
   { id: '4h', ms: 240 * 60e3, td: '4h', bn: '4h' },
 ];
-const ALERT_FRESH = 2;   // alert only if the confirmation candle is among the last 2 closed candles
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem('lst2.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -221,7 +220,6 @@ function refreshAll(force) {
 // ---------- signals ----------
 function checkSignals(key) {
   const s = series[key]; const c = s.candles;
-  const lastT = c.length ? c[c.length - 1].t : 0;
   for (const day of s.res.slice(-4)) {
     for (const sd of day.sides) {
       if (sd.state !== 'signal') continue;
@@ -230,7 +228,7 @@ function checkSignals(key) {
       seen.add(id);
       const rec = { id, t: sd.confT + s.tf.ms, inst: s.instr.name, tf: s.tf.id, dir: sd.dir, model: sd.model, entry: sd.entry, stop: sd.stop, partial: sd.partialPassed ? null : sd.partial, target: sd.target, prime: isPrime(sd.confT + s.tf.ms), dp: s.instr.dp };
       sigHist.unshift(rec);
-      const fresh = lastT - sd.confT <= (ALERT_FRESH - 1) * s.tf.ms;
+      const fresh = Date.now() - (sd.confT + s.tf.ms) <= s.tf.ms;   // alert only if the model candle closed less than one candle ago
       if (fresh) fireAlert(rec);
     }
   }
