@@ -30,11 +30,11 @@
   #banner .x { margin-left: auto; background: rgba(0,0,0,.25); border: 0; color: inherit; }
   #banner .lvls { font-weight: 400; font-size: 14px; }
 
-  .grid { display: grid; grid-template-columns: 140px repeat(4, 1fr); gap: 8px; overflow-x: auto; }
+  .grid { display: grid; grid-template-columns: 140px repeat(5, 1fr); gap: 8px; overflow-x: auto; }
   .gh { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; padding: 4px 6px; }
   .inst { display: flex; flex-direction: column; justify-content: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
   .inst b { font-size: 16px; } .inst small { color: var(--muted); font-size: 11px; }
-  .cell { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; min-height: 118px; min-width: 190px; transition: border-color .15s; }
+  .cell { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; min-height: 118px; min-width: 175px; transition: border-color .15s; }
   .cell:hover { border-color: var(--muted); } .cell.sel { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
   .cell.hot-SELL { background: linear-gradient(0deg, rgba(239,83,80,.12), rgba(239,83,80,.12)), var(--panel); border-color: var(--sell); }
   .cell.hot-BUY { background: linear-gradient(0deg, rgba(47,191,113,.12), rgba(47,191,113,.12)), var(--panel); border-color: var(--buy); }
@@ -48,6 +48,7 @@
   .tag.wait { background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
   .tag.grab { background: var(--warn); color: #1a1000; } .tag.cont { background: var(--info); color: #001428; }
   .err { color: var(--sell); font-size: 12px; }
+  .rs { font-weight: 600; } .rs.small { color: var(--buy); } .rs.large { color: var(--warn); } .rs.normal { color: var(--muted); }
 
   .two { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 18px; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
@@ -92,8 +93,9 @@
       <div class="legend">
         <span><i style="background:var(--info);opacity:.5;height:10px"></i>Asia session</span>
         <span><i style="background:var(--gold)"></i>Asia high / low (liquidity $$$)</span>
-        <span><i style="background:var(--sell)"></i>Stop reference</span>
-        <span><i style="background:var(--buy)"></i>50% partial</span>
+        <span><i style="background:var(--sell)"></i>Stop (add margin)</span>
+        <span><i style="background:var(--buy)"></i>50%: partials + break-even</span>
+        <span><i style="background:var(--info)"></i>Target (next liquidity)</span>
       </div>
       <div class="detail" id="detail"></div>
     </div>
@@ -114,17 +116,16 @@
   <details class="card rules">
     <summary><b>Rules this page applies (from the LST PDF)</b></summary>
     <ol>
-      <li><b>Asia range</b>: the high and low from 7:00 PM to 3:00 AM New York time are the liquidity levels.</li>
-      <li><b>Liquidity grab</b>: between 3:00 AM and 12:00 PM NY (London and New York openings), price trades above the Asia high (looking for a SELL, M pattern) or below the Asia low (looking for a BUY, W pattern).</li>
-      <li><b>Confirmation (Type 2, Manipulation Liquidity)</b>:
-        <b>Model 1</b>: the grab candle closes back inside the range.
-        <b>Model 2</b>: the next candle engulfs the grab candle and closes back inside.
-        <b>Model 3</b>: the third candle engulfs the second and closes back inside.</li>
-      <li><b>Continuation (Type 1)</b>: if none of the 3 models appears and price stays beyond the level, the page labels it "Continuation" and does not alert.</li>
-      <li><b>Management</b>: stop reference = the extreme of the grab. Move to break-even and take partial profits at <b>50%</b> of the move that took the liquidity.</li>
-      <li>Only <b>closed</b> candles are analyzed. One signal per side, per day, per timeframe.</li>
+      <li><b>Asia range</b> (LST 2.0): the high and low from 7:00 PM to 2:00 AM New York time are the liquidity levels. The range is labeled <b>small</b> (compressed energy, best days), <b>normal</b> or <b>large</b> (energy already spent in Asia) against the last 10 days.</li>
+      <li><b>Liquidity grab</b>: after Asia and until 12:00 PM NY, price trades above the Asia high (looking for a SELL, M pattern) or below the Asia low (looking for a BUY, W pattern). <b>🔥 PRIME</b> marks confirmations in the prime hours: London 3:00–5:00 AM and New York 9:00–11:00 AM.</li>
+      <li><b>Confirmation (Type 2, Manipulation Liquidity)</b>, always on a <b>closed</b> candle:
+        <b>Model 1</b>: the grab candle closes back past the line, in the opposite half of the candle, with a visible rejection wick (damage).
+        <b>Model 2</b>: the next candle is an engulfing that covers at least <b>50%</b> of candle #1's body and closes back past the line.
+        <b>Model 3</b>: the third candle closes back past the line with a solid body.</li>
+      <li><b>Continuation (Type 1)</b>: if no model appears and price stays beyond the level, the page labels it "Type 1" and does not alert. If price returns inside without a model, a new sweep is evaluated again.</li>
+      <li><b>Management</b>: entry at the close of the model candle. Stop beyond the wick that took the liquidity, with some margin (never inside the model). At <b>50%</b> of the move that took the liquidity: take 25–50% partials and move to break-even (never BE without partials). Target: the next liquidity, here the opposite side of the Asia range. Leave a small "pawn" running.</li>
     </ol>
-    <p>Not included yet (version 2): Fibonacci 0.618 / 0.7 / 0.786 entries and internal liquidity points. This page only sends alerts. It never places trades.</p>
+    <p>Not automated (needs your eye): Fibonacci 0.5 / 0.618 entries, internal liquidity points, Setup B, the higher-timeframe trend (a model with the trend is worth more) and S/R zones. This page only sends alerts. It never places trades.</p>
   </details>
 </main>
 
@@ -140,12 +141,13 @@ const TFS = [
   { id: '30m', ms: 30 * 60e3, td: '30min', bn: '30m' },
   { id: '1h', ms: 60 * 60e3, td: '1h', bn: '1h' },
   { id: '2h', ms: 120 * 60e3, td: '2h', bn: '2h' },
+  { id: '4h', ms: 240 * 60e3, td: '4h', bn: '4h' },
 ];
 const ALERT_FRESH = 2;   // alert only if the confirmation candle is among the last 2 closed candles
 
 const store = {
-  get(k, d) { try { const v = localStorage.getItem('lst.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('lst.' + k, JSON.stringify(v)); } catch {} },
+  get(k, d) { try { const v = localStorage.getItem('lst2.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('lst2.' + k, JSON.stringify(v)); } catch {} },
 };
 let apiKey = store.get('key', '');
 let seen = new Set(store.get('seen', []));
@@ -226,7 +228,7 @@ function checkSignals(key) {
       const id = `${key}|${day.day}|${sd.side}`;
       if (seen.has(id)) continue;
       seen.add(id);
-      const rec = { id, t: sd.confT + s.tf.ms, inst: s.instr.name, tf: s.tf.id, dir: sd.dir, model: sd.model, entry: sd.entry, stop: sd.stop, partial: sd.partial, dp: s.instr.dp };
+      const rec = { id, t: sd.confT + s.tf.ms, inst: s.instr.name, tf: s.tf.id, dir: sd.dir, model: sd.model, entry: sd.entry, stop: sd.stop, partial: sd.partialPassed ? null : sd.partial, target: sd.target, prime: isPrime(sd.confT + s.tf.ms), dp: s.instr.dp };
       sigHist.unshift(rec);
       const fresh = lastT - sd.confT <= (ALERT_FRESH - 1) * s.tf.ms;
       if (fresh) fireAlert(rec);
@@ -240,8 +242,8 @@ function checkSignals(key) {
 function fireAlert(r) {
   const b = document.getElementById('banner');
   b.className = 'show ' + r.dir;
-  document.getElementById('bannerText').textContent = `${r.dir} · ${r.inst} ${r.tf} · Model ${r.model} confirmed (candle closed ${fmtNY(r.t)} NY)`;
-  document.getElementById('bannerLv').textContent = `Entry ~${fmtP(r.entry, r.dp)} · Stop ref ${fmtP(r.stop, r.dp)} · 50% partial ${fmtP(r.partial, r.dp)}`;
+  document.getElementById('bannerText').textContent = `${r.prime ? '🔥 PRIME · ' : ''}${r.dir} · ${r.inst} ${r.tf} · Model ${r.model} confirmed (candle closed ${fmtNY(r.t)} NY)`;
+  document.getElementById('bannerLv').textContent = `Entry ~${fmtP(r.entry, r.dp)} · Stop beyond ${fmtP(r.stop, r.dp)} · 50% partials + BE ${r.partial == null ? 'already passed' : fmtP(r.partial, r.dp)}` + (r.target ? ` · Target ${fmtP(r.target, r.dp)}` : '');
   document.title = `🔔 ${r.dir} ${r.inst} ${r.tf}`;
   beep(r.dir);
 }
@@ -277,7 +279,7 @@ function statusFor(s) {
   return day.sides.map(sd => {
     const lvl = sd.side === 'sell' ? 'Asia high' : 'Asia low';
     switch (sd.state) {
-      case 'signal': return [sd.dir, sd.dir + ' M' + sd.model, `Model ${sd.model} confirmed at ${fmtNY(sd.confT + s.tf.ms).split(', ')[1]} NY`];
+      case 'signal': return [sd.dir, sd.dir + ' M' + sd.model, `Model ${sd.model} confirmed at ${fmtNY(sd.confT + s.tf.ms).split(', ')[1]} NY${isPrime(sd.confT + s.tf.ms) ? ' 🔥 PRIME' : ''}`];
       case 'grabbed': return ['grab', 'GRAB', `${lvl} taken: waiting for confirmation`];
       case 'continuation': return ['cont', 'TYPE 1', `${lvl} broken: continuation, no reversal`];
       case 'nomodel': return ['wait', 'NO MODEL', `${lvl} taken, no valid model`];
@@ -309,7 +311,7 @@ function renderCell(key) {
   if (hot) el.classList.add('hot-' + hot[0]);
   el.innerHTML = `
     <div class="row1"><span class="price">${fmtP(last && last.c, dp)}</span><span class="age">close ${last ? fmtNY(last.t + s.tf.ms).split(', ')[1] : ''}</span></div>
-    <div class="lv">Asia H ${fmtP(day && day.hi, dp)} · L ${fmtP(day && day.lo, dp)}</div>
+    <div class="lv">Asia H ${fmtP(day && day.hi, dp)} · L ${fmtP(day && day.lo, dp)}${day && day.rangeSize ? ` · <span class="rs ${day.rangeSize}">${{ small: 'small range', normal: 'normal range', large: 'large range' }[day.rangeSize]}</span>` : ''}</div>
     ${sts.map(([cls, tag, txt]) => `<div class="st"><span class="tag ${cls}">${tag}</span><span>${txt}</span></div>`).join('')}`;
   document.getElementById('src-' + s.instr.id).textContent = s.source || '';
 }
@@ -317,7 +319,7 @@ function renderAll() { for (const k in series) renderCell(k); renderDetail(); re
 
 function renderHistory() {
   document.getElementById('hist').innerHTML = sigHist.length ? sigHist.map(r =>
-    `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.dir} M${r.model}</span></td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td>${fmtP(r.partial, r.dp)}</td></tr>`
+    `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td>${fmtP(r.partial, r.dp)}</td></tr>`
   ).join('') : '<tr><td colspan="7" style="color:var(--muted)">No signals yet.</td></tr>';
 }
 
@@ -332,9 +334,10 @@ function renderDetail() {
   drawChart(s);
   const day = s.res[s.res.length - 1], dp = s.instr.dp, d = document.getElementById('detail');
   if (!day) { d.innerHTML = ''; return; }
-  let html = `<div>Trading day <b>${day.day}</b> · Asia high <b>${fmtP(day.hi, dp)}</b> · Asia low <b>${fmtP(day.lo, dp)}</b></div>`;
+  const rsTxt = { small: 'small (compressed energy: best days)', normal: 'normal', large: 'large (energy spent in Asia: London may be slow or only reach 50%)' };
+  let html = `<div>Trading day <b>${day.day}</b> · Asia high <b>${fmtP(day.hi, dp)}</b> · Asia low <b>${fmtP(day.lo, dp)}</b>${day.rangeSize ? ` · Range <b>${rsTxt[day.rangeSize]}</b> (${day.rangeRatio.toFixed(2)}× the 10-day average)` : ''}</div>`;
   for (const sd of day.sides) if (sd.state === 'signal')
-    html += `<div><span class="tag ${sd.dir}">${sd.dir} · Model ${sd.model}</span> Entry ~<b>${fmtP(sd.entry, dp)}</b> · Stop ref <b>${fmtP(sd.stop, dp)}</b> · Break-even + partial at 50%: <b>${fmtP(sd.partial, dp)}</b></div>`;
+    html += `<div><span class="tag ${sd.dir}">${sd.dir} · Model ${sd.model}</span>${isPrime(sd.confT + s.tf.ms) ? ' 🔥 PRIME' : ''} Entry ~<b>${fmtP(sd.entry, dp)}</b> · Stop beyond <b>${fmtP(sd.stop, dp)}</b> (add margin) · ${sd.partialPassed ? '50% already reached when the model closed: manage toward the target' : `50%: take 25–50% partials + move to BE at <b>${fmtP(sd.partial, dp)}</b>`}${sd.target ? ` · Target (next liquidity) <b>${fmtP(sd.target, dp)}</b>` : ''}</div>`;
   d.innerHTML = html;
 }
 
@@ -349,9 +352,9 @@ function drawChart(s) {
   const day = s.res[s.res.length - 1];
   const sig = day ? day.sides.filter(x => x.state === 'signal') : [];
   const vals = cs.flatMap(c => [c.h, c.l]);
-  if (day) vals.push(day.hi, day.lo); sig.forEach(x => vals.push(x.stop, x.partial));
+  if (day) vals.push(day.hi, day.lo); sig.forEach(x => { vals.push(x.stop, x.partial); if (x.target) vals.push(x.target); });
   let mx = Math.max(...vals), mn = Math.min(...vals); const pad = (mx - mn) * 0.06 || 1; mx += pad; mn -= pad;
-  const R = 64, cw = (W - R) / n, y = v => (mx - v) / (mx - mn) * (H - 10) + 5, x = i => i * cw + cw / 2;
+  const R = 104, cw = (W - R) / n, y = v => (mx - v) / (mx - mn) * (H - 10) + 5, x = i => i * cw + cw / 2;
   const asiaSet = new Set(day ? day.asiaCandles : []);
   ctx.fillStyle = 'rgba(88,166,255,.10)';
   cs.forEach((c, i) => { if (asiaSet.has(c.t)) ctx.fillRect(i * cw, 0, cw + .5, H); });
@@ -359,8 +362,9 @@ function drawChart(s) {
     ctx.strokeStyle = col; ctx.setLineDash(dash); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, y(v)); ctx.lineTo(W - R, y(v)); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = col; ctx.font = '11px Segoe UI'; ctx.fillText(label, W - R + 4, y(v) + 4);
   };
-  if (day) { hline(day.hi, css('--gold'), [6, 4], 'Asia H $$$'); hline(day.lo, css('--gold'), [6, 4], 'Asia L $$$'); }
-  sig.forEach(sd => { hline(sd.stop, css('--sell'), [2, 3], 'Stop'); hline(sd.partial, css('--buy'), [2, 3], '50%'); });
+  const isTgt = v => sig.some(sd => sd.target === v);
+  if (day) { hline(day.hi, css('--gold'), [6, 4], 'Asia H $$$' + (isTgt(day.hi) ? ' · Target' : '')); hline(day.lo, css('--gold'), [6, 4], 'Asia L $$$' + (isTgt(day.lo) ? ' · Target' : '')); }
+  sig.forEach(sd => { hline(sd.stop, css('--sell'), [2, 3], 'Stop'); if (!sd.partialPassed) hline(sd.partial, css('--buy'), [2, 3], '50% BE'); if (sd.target && sd.target !== day.hi && sd.target !== day.lo) hline(sd.target, css('--info'), [2, 3], 'Target'); });
   const up = css('--buy'), dn = css('--sell');
   cs.forEach((c, i) => {
     const col = c.c >= c.o ? up : dn; ctx.strokeStyle = col; ctx.fillStyle = col;
@@ -397,7 +401,7 @@ function tickClock() {
   document.getElementById('localClock').textContent = new Date(now).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   const s = sessionOf(now), el = document.getElementById('sess');
   el.className = 'sess ' + s;
-  el.textContent = { asia: 'Asia: building range', london: 'London: liquidity hunt', newyork: 'New York: liquidity hunt', off: 'Outside hunt window' }[s];
+  el.textContent = { asia: 'Asia: building range', london: 'London: liquidity hunt', newyork: 'New York: liquidity hunt', off: 'Outside hunt window' }[s] + (isPrime(now) ? ' · 🔥 Prime hours' : '');
 }
 
 buildGrid(); renderAll(); tickClock();
