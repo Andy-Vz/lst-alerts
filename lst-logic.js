@@ -230,6 +230,107 @@ function detectFib(day, sd) {
   return { ...out, B, bT: X[bIdx].t, levels: levels(), state, depth: lastDepth };
 }
 
+// ---------- Setup B: "the second chance" (LST 2.0 pp. 182-186) ----------
+// A model is already confirmed -> price breaks the nearest S/R with force in favour of the model (A) ->
+// a corrective retest comes back to that broken zone (B) -> a model confirms there, at an internal liquidity
+// point, sweeping the first buyers/sellers, or at the S/R line itself (C).
+const SR_LOOKBACK = 48;      // candles before the model used to find S/R (swing points)
+const FORCE_BODY = 0.5;      // breaking candle: body >= 50% of its range...
+const FORCE_RANGE = 1.0;     // ...and range >= the day's average candle range
+const ZONE_TOL = 0.25;       // S/R is a zone: level +/- 25% of the average candle range
+
+function detectSetupB(day, sd, prevDay) {
+  if (sd.state !== 'signal') return null;
+  const X = day.seq.concat(day.post);
+  const sell = sd.dir === 'SELL', dir = sd.dir;
+  const ci = X.findIndex(c => c.t === sd.confT);
+  if (ci < 0) return null;
+  const avgRange = X.reduce((s, c) => s + (c.h - c.l), 0) / X.length;
+  const tol = ZONE_TOL * avgRange;
+  const pull = c => sell ? c.h : c.l;           // retest side
+  const ext = c => sell ? c.l : c.h;            // trend side
+  const beyond = (a, b) => sell ? a < b : a > b; // a is further in the trade direction than b
+  const body = c => Math.abs(c.c - c.o), range = c => Math.max(c.h - c.l, 1e-12);
+
+  // S/R candidates in the direction of the trade: swing points before the model + previous day's high/low
+  let cands = [];
+  for (let j = Math.max(PIVOT, ci - SR_LOOKBACK); j + PIVOT <= ci; j++) {
+    const v = ext(X[j]); let piv = true;
+    for (let k = 1; k <= PIVOT && piv; k++) if (!beyond(v, ext(X[j - k])) || !beyond(v, ext(X[j + k]))) piv = false;
+    if (piv) cands.push(v);
+  }
+  if (prevDay) {   // previous trading day's full high / low
+    const pd = prevDay.seq.concat(prevDay.post);
+    if (pd.length) cands.push(Math.max(...pd.map(c => c.h)), Math.min(...pd.map(c => c.l)));
+  }
+  const entry0 = X[ci].c;
+  cands = [...new Set(cands)].filter(v => beyond(v, entry0) && Math.abs(v - entry0) > tol)
+    .sort((a, b) => Math.abs(a - entry0) - Math.abs(b - entry0));
+  const base = { kind: 'setupB', side: sd.side, dir, modelT: sd.confT };
+  if (!cands.length) return null;
+
+  let level = null, bi = -1;
+  let i = ci + 1;
+  for (; i < X.length && level === null; i++) {
+    const c = X[i];
+    if (!beyond(pull(c), sd.stop)) return null;                 // original model stopped out
+    const passed = cands.filter(v => beyond(c.c, v));            // levels this candle closed through
+    if (!passed.length) continue;
+    const forceful = (sell ? c.c < c.o : c.c > c.o) && body(c) / range(c) >= FORCE_BODY && range(c) >= FORCE_RANGE * avgRange;
+    if (forceful) { level = passed[passed.length - 1]; bi = i; }
+    else cands = cands.filter(v => !passed.includes(v));         // broken without force: not a valid zone
+  }
+  if (level === null) return cands.length ? { ...base, state: 'srwait', level: cands[0] } : null;
+
+  // B: corrective retest of the broken zone, then C: a model there
+  let E = ext(X[bi]), eIdx = bi;
+  const breakBody = body(X[bi]);
+  for (; i < X.length; i++) {
+    const c = X[i];
+    if (!beyond(pull(c), sd.stop)) return { ...base, state: 'invalid', level };
+    if (beyond(ext(c), E)) { E = ext(c); eIdx = i; }
+    const inZone = sell ? c.h >= level - tol : c.l <= level + tol;
+    if (!inZone) continue;
+    const leg = X.slice(eIdx + 1, i + 1);
+    const corrective = leg.length > 0 && leg.reduce((s, x) => s + body(x), 0) / leg.length < breakBody;
+    if (!corrective) continue;
+    // liquidity points: the S/R line itself + swing points (retest side) since the model that this candle sweeps
+    const pts = [{ v: level, what: 'S/R zone' }];
+    for (let j = ci + PIVOT; j + PIVOT <= i - 1; j++) {
+      const v = pull(X[j]); let piv = true;
+      for (let k = 1; k <= PIVOT && piv; k++) if (!beyond(pull(X[j - k]), v) || !beyond(pull(X[j + k]), v)) piv = false;
+      if (!piv) continue;
+      let taken = false;
+      for (let k = j + 1; k < i && !taken; k++) if (beyond(v, pull(X[k]))) taken = true;
+      if (!taken) pts.push({ v, what: j < eIdx ? 'internal liquidity' : 'first ' + (sell ? 'buyers' : 'sellers') + ' of the retest' });
+    }
+    const swept = pts.filter(p => beyond(p.v, pull(c)));
+    if (!swept.length) continue;
+    const P = swept.reduce((a, b) => beyond(a.v, b.v) ? b : a);
+    const k = helpers(sell, P.v);
+    let model = null, mi = -1;
+    if (k.m1(c)) { model = 1; mi = i; }
+    else if (X[i + 1] && k.m2(X[i + 1], c)) { model = 2; mi = i + 1; }
+    else if (X[i + 2] && k.m3(X[i + 2])) { model = 3; mi = i + 2; }
+    if (model === null) {
+      if (!X[i + 2]) return { ...base, state: 'grabbed', level, breakT: X[bi].t };
+      continue;
+    }
+    const span = X.slice(i, mi + 1), conf = X[mi];
+    const stop = sell ? Math.max(...span.map(x => x.h)) : Math.min(...span.map(x => x.l));
+    const partial = (stop + E) / 2;
+    const target = sd.target != null && beyond(sd.target, conf.c) ? sd.target : beyond(E, conf.c) ? E : null;
+    const rr = target != null ? Math.abs(target - conf.c) / Math.max(Math.abs(conf.c - stop), 1e-12) : null;   // book p.169: skip below 1:2
+    return {
+      ...base, state: 'signal', level, breakT: X[bi].t, model, grabT: c.t, confT: conf.t, entry: conf.c, stop,
+      partial, partialPassed: sell ? conf.c <= partial : conf.c >= partial, target, rr, pointKind: P.what
+    };
+  }
+  const last = X[X.length - 1];
+  const inZoneNow = sell ? last.h >= level - tol : last.l <= level + tol;
+  return { ...base, state: inZoneNow ? 'retest' : 'broken', level, breakT: X[bi].t };
+}
+
 function analyze(candles, tfMs) {
   const days = groupDays(candles, tfMs).filter(d => d.asiaOk);
   const out = [];
@@ -242,9 +343,10 @@ function analyze(candles, tfMs) {
     const res = { day: d.key, hi: d.hi, lo: d.lo, asiaDone, rangeRatio: ratio, rangeSize, asiaCandles: d.asia.map(c => c.t), sides: [] };
     if (asiaDone) res.sides = [detectSide(d, 'sell'), detectSide(d, 'buy')];
     res.fibs = res.sides.map(sd => detectFib(d, sd)).filter(f => f && f.state !== 'invalid' && f.state !== 'small');
+    res.setupB = res.sides.map(sd => detectSetupB(d, sd, idx > 0 ? days[idx - 1] : null)).filter(b => b && b.state !== 'invalid');
     out.push(res);
   });
   return out;   // oldest -> newest
 }
 
-if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, analyze };
+if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, analyze };

@@ -8,21 +8,22 @@
   :root {
     --bg: #0d1117; --panel: #161b22; --panel2: #1c232d; --line: #2a333f;
     --text: #e6edf3; --muted: #8b98a8; --gold: #e8c547;
-    --buy: #2fbf71; --sell: #ef5350; --warn: #f0a33a; --info: #58a6ff; --fib: #b98cff;
+    --buy: #2fbf71; --sell: #ef5350; --warn: #f0a33a; --info: #58a6ff; --fib: #b98cff; --setb: #3fd0c9;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
-  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
   h1 { margin: 0; font-size: 20px; font-weight: 600; color: var(--gold); letter-spacing: .3px; }
   .clock { font-variant-numeric: tabular-nums; color: var(--muted); }
   .clock b { color: var(--text); }
   .sess { padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--panel2); border: 1px solid var(--line); }
   .sess.asia { color: var(--info); } .sess.london, .sess.newyork { color: var(--gold); } .sess.off { color: var(--muted); }
   .spacer { flex: 1; }
-  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; font: inherit; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; cursor: pointer; font: inherit; }
   button:hover { border-color: var(--gold); }
   button.on { border-color: var(--buy); color: var(--buy); }
   #fibBtn.on { border-color: var(--fib); color: var(--fib); }
+  #setbBtn.on { border-color: var(--setb); color: var(--setb); }
   main { padding: 18px 20px 40px; max-width: 1400px; margin: 0 auto; }
 
   #banner { display: none; position: sticky; top: 0; z-index: 10; padding: 14px 20px; font-size: 17px; font-weight: 600; align-items: center; gap: 16px; }
@@ -48,6 +49,8 @@
   .tag.SELL { background: var(--sell); color: #fff; } .tag.BUY { background: var(--buy); color: #04140b; }
   .tag.wait { background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
   .tag.fib { background: var(--fib); color: #160a2b; }
+  .tag.setb { background: var(--setb); color: #002623; }
+  .rrlow { color: var(--warn); font-weight: 600; }
   .tag.grab { background: var(--warn); color: #1a1000; } .tag.cont { background: var(--info); color: #001428; }
   .err { color: var(--sell); font-size: 12px; }
   .rs { font-weight: 600; } .rs.small { color: var(--buy); } .rs.large { color: var(--warn); } .rs.normal { color: var(--muted); }
@@ -83,8 +86,9 @@
   <span class="spacer"></span>
   <button id="soundBtn" onclick="toggleSound()">🔇 Sound off</button>
   <button id="fibBtn" onclick="toggleFib()"></button>
-  <button onclick="testAlert()">Test alert</button>
-  <button onclick="refreshAll(true)">Refresh now</button>
+  <button id="setbBtn" onclick="toggleSetb()"></button>
+  <button onclick="testAlert()" title="Play a test alert">🔔 Test</button>
+  <button onclick="refreshAll(true)" title="Refresh all prices now">⟳ Refresh</button>
 </header>
 <main>
   <div class="grid" id="grid"></div>
@@ -100,6 +104,7 @@
         <span><i style="background:var(--buy)"></i>50%: partials + break-even</span>
         <span><i style="background:var(--info)"></i>Target (next liquidity)</span>
         <span id="fibLegend"><i style="background:var(--fib);opacity:.5;height:10px"></i>Fibonacci pullback · Golden zone 61.8–78.6%</span>
+        <span id="setbLegend"><i style="background:var(--setb)"></i>Setup B: broken S/R to retest</span>
       </div>
       <div class="detail" id="detail"></div>
     </div>
@@ -130,11 +135,12 @@
       <li><b>Management</b>: entry at the close of the model candle. Stop beyond the wick that took the liquidity, with some margin (never inside the model). At <b>50%</b> of the move that took the liquidity: take 25–50% partials and move to break-even (never BE without partials). Target: the next liquidity, here the opposite side of the Asia range. Leave a small "pawn" running.</li>
       <li><b>Fibonacci pullback</b> (LST 2.0 pp. 97, 138–144): once the direction is set (a confirmed model, or Type 1 continuation through the Asia level), the page measures the impulse from its origin to its extreme. In the pullback it waits for at least the <b>50%</b> (best: the <b>Golden zone 61.8–78.6%</b>), for price to take an <b>internal liquidity point</b> (a swing low/high inside the impulse) or the <b>first buyers/sellers</b> of the correction, and for Model 1, 2 or 3 in favour of the trend. Stop beyond the sweep · 50% of the pullback for partials + BE · target: the impulse extreme. If the pullback reaches the origin, the setup is cancelled.</li>
     </ol>
-    <p>Not automated (needs your eye): Setup B, the higher-timeframe trend (a model with the trend is worth more) and S/R zones. This page only sends alerts. It never places trades.</p>
+    <p><b>Setup B, the second chance</b> (LST 2.0 pp. 182–186): after a confirmed model, the page finds the nearest S/R in the trade's direction (swing points before the model and the previous day's high/low). (A) Price must break it <b>with force</b> (a strong candle closing through it). (B) Price comes back to retest that zone with <b>weaker, corrective candles</b>. (C) A model confirms there, at the S/R line, an internal liquidity point or the first buyers/sellers of the retest. The page shows the risk:reward and flags anything below <b>1:2</b>, where the book says to skip the trade.</p>
+    <p>Not automated (needs your eye): the higher-timeframe trend (a model with the trend is worth more) and S/R zones. This page only sends alerts. It never places trades.</p>
   </details>
 </main>
 
-<script src="lst-logic.js?v=3"></script>
+<script src="lst-logic.js?v=4"></script>
 <script>
 const INSTR = [
   { id: 'XAU', name: 'Gold', td: 'XAU/USD', bn: 'PAXGUSDT', dp: 2 },
@@ -170,6 +176,20 @@ function renderFibBtn() {
   b.title = 'Show / hide Fibonacci pullback setups and their alerts';
   b.classList.toggle('on', fibOn);
   document.getElementById('fibLegend').style.display = fibOn ? '' : 'none';
+}
+let setbOn = store.get('setb', true);
+const setbOf = day => setbOn && day && day.setupB ? day.setupB : [];
+function toggleSetb() {
+  setbOn = !setbOn; store.set('setb', setbOn); renderSetbBtn();
+  if (setbOn) for (const k in series) if (!series[k].loading) checkSignals(k);
+  renderAll();
+}
+function renderSetbBtn() {
+  const b = document.getElementById('setbBtn');
+  b.textContent = setbOn ? '🔁 B on' : '🔁 B off';
+  b.title = 'Show / hide Setup B (broken S/R + retest) and its alerts';
+  b.classList.toggle('on', setbOn);
+  document.getElementById('setbLegend').style.display = setbOn ? '' : 'none';
 }
 let selected = 'XAU|15m';
 
@@ -241,13 +261,15 @@ function checkSignals(key) {
   const s = series[key]; const c = s.candles;
   for (const day of s.res.slice(-4)) {
     const sigs = day.sides.map(sd => ({ sd, id: `${key}|${day.day}|${sd.side}` }))
-      .concat(fibsOf(day).map(sd => ({ sd, id: `${key}|${day.day}|fib-${sd.dir}` })));
+      .concat(fibsOf(day).map(sd => ({ sd, id: `${key}|${day.day}|fib-${sd.dir}` })))
+      .concat(setbOf(day).map(sd => ({ sd, id: `${key}|${day.day}|setb-${sd.dir}` })));
     for (const { sd, id } of sigs) {
       if (sd.state !== 'signal') continue;
       if (seen.has(id)) continue;
       seen.add(id);
       const rec = { id, t: sd.confT + s.tf.ms, inst: s.instr.name, tf: s.tf.id, dir: sd.dir, model: sd.model, entry: sd.entry, stop: sd.stop, partial: sd.partialPassed ? null : sd.partial, target: sd.target, prime: isPrime(sd.confT + s.tf.ms), dp: s.instr.dp };
       if (sd.kind === 'fib') Object.assign(rec, { fib: true, zone: sd.zone, depth: sd.depth, pointKind: sd.pointKind });
+      if (sd.kind === 'setupB') Object.assign(rec, { setb: true, level: sd.level, rr: sd.rr, pointKind: sd.pointKind });
       sigHist.unshift(rec);
       const fresh = Date.now() - (sd.confT + s.tf.ms) <= s.tf.ms;   // alert only if the model candle closed less than one candle ago
       if (fresh) fireAlert(rec);
@@ -261,7 +283,7 @@ function checkSignals(key) {
 function fireAlert(r) {
   const b = document.getElementById('banner');
   b.className = 'show ' + r.dir;
-  document.getElementById('bannerText').textContent = `${r.prime ? '🔥 PRIME · ' : ''}${r.dir} · ${r.inst} ${r.tf} · ${r.fib ? `Fib pullback Model ${r.model} (${r.zone} ${Math.round(r.depth * 100)}%, ${r.pointKind})` : `Model ${r.model} confirmed`} (candle closed ${fmtNY(r.t)} NY)`;
+  document.getElementById('bannerText').textContent = `${r.prime ? '🔥 PRIME · ' : ''}${r.dir} · ${r.inst} ${r.tf} · ${r.fib ? `Fib pullback Model ${r.model} (${r.zone} ${Math.round(r.depth * 100)}%, ${r.pointKind})` : r.setb ? `Setup B Model ${r.model} (retest of broken S/R ${fmtP(r.level, r.dp)}${r.rr != null && r.rr < 2 ? ', ⚠ R:R below 1:2' : ''})` : `Model ${r.model} confirmed`} (candle closed ${fmtNY(r.t)} NY)`;
   document.getElementById('bannerLv').textContent = `Entry ~${fmtP(r.entry, r.dp)} · Stop beyond ${fmtP(r.stop, r.dp)} · 50% partials + BE ${r.partial == null ? 'already passed' : fmtP(r.partial, r.dp)}` + (r.target ? ` · Target ${fmtP(r.target, r.dp)}` : '');
   document.title = `🔔 ${r.dir} ${r.inst} ${r.tf}`;
   beep(r.dir);
@@ -312,6 +334,15 @@ function statusFor(s) {
       case 'zone': return ['fib', 'FIB ZONE', `${f.dir} pullback at ${Math.round(f.depth * 100)}%: watch liquidity points`];
       default: return ['wait', 'FIB', `${f.dir} impulse · Golden zone ${gz}`];
     }
+  })).concat(setbOf(day).map(b => {
+    const lv = fmtP(b.level, s.instr.dp);
+    switch (b.state) {
+      case 'signal': return [b.dir, 'B ' + b.dir + ' M' + b.model, `Setup B: retest of ${lv} confirmed at ${fmtNY(b.confT + s.tf.ms).split(', ')[1]} NY${isPrime(b.confT + s.tf.ms) ? ' 🔥 PRIME' : ''}${b.rr != null && b.rr < 2 ? ' · ⚠ R:R < 1:2' : ''}`];
+      case 'grabbed': return ['grab', 'SETUP B', `Retest of ${lv} took liquidity: waiting confirmation`];
+      case 'retest': return ['setb', 'SETUP B', `Price retesting broken S/R ${lv}: watch for a model`];
+      case 'broken': return ['setb', 'SETUP B', `S/R ${lv} broken with force: waiting for the retest`];
+      default: return ['wait', 'SETUP B', `Next S/R ${lv}: waiting for a strong break`];
+    }
   }));
 }
 
@@ -345,9 +376,9 @@ function renderCell(key) {
 function renderAll() { for (const k in series) renderCell(k); renderDetail(); renderHistory(); renderSrc(); }
 
 function renderHistory() {
-  const rows = sigHist.filter(r => fibOn || !r.fib);
+  const rows = sigHist.filter(r => (fibOn || !r.fib) && (setbOn || !r.setb));
   document.getElementById('hist').innerHTML = rows.length ? rows.map(r =>
-    `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? 'FIB ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td>${fmtP(r.partial, r.dp)}</td></tr>`
+    `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? 'FIB ' : r.setb ? 'B ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td>${fmtP(r.partial, r.dp)}</td></tr>`
   ).join('') : '<tr><td colspan="7" style="color:var(--muted)">No signals yet.</td></tr>';
 }
 
@@ -374,6 +405,13 @@ function renderDetail() {
     else
       html += `<div><span class="tag fib">FIB ${f.dir}</span> Impulse ${from}: ${fmtP(f.A, dp)} → ${fmtP(f.B, dp)} · Golden zone ${gz}${f.state === 'zone' ? ` · price is at <b>${Math.round(f.depth * 100)}%</b>: waiting for a model at a liquidity point` : f.state === 'grabbed' ? ' · liquidity taken: waiting for confirmation' : ' · waiting for the pullback'}</div>`;
   }
+  for (const b of setbOf(day)) {
+    const lv = `<b>${fmtP(b.level, dp)}</b>`;
+    if (b.state === 'signal')
+      html += `<div><span class="tag ${b.dir}">SETUP B ${b.dir} · Model ${b.model}</span>${isPrime(b.confT + s.tf.ms) ? ' 🔥 PRIME' : ''} Second chance: S/R ${lv} broken with force, corrective retest, model at the <b>${b.pointKind}</b>. Entry ~<b>${fmtP(b.entry, dp)}</b> · Stop beyond <b>${fmtP(b.stop, dp)}</b> · ${b.partialPassed ? '50% already reached' : `50%: partials + BE at <b>${fmtP(b.partial, dp)}</b>`}${b.target ? ` · Target <b>${fmtP(b.target, dp)}</b>` : ''}${b.rr != null ? ` · R:R <span class="${b.rr < 2 ? 'rrlow' : ''}">1:${b.rr.toFixed(1)}${b.rr < 2 ? ' (book: skip below 1:2)' : ''}</span>` : ''}</div>`;
+    else
+      html += `<div><span class="tag setb">SETUP B ${b.dir}</span> After the Model: ${{ srwait: `nearest S/R ${lv}, waiting for a strong break`, broken: `S/R ${lv} broken with force, waiting for a corrective retest`, retest: `price is retesting ${lv}, waiting for a model`, grabbed: `retest of ${lv} took liquidity, waiting for confirmation` }[b.state]}</div>`;
+  }
   d.innerHTML = html;
 }
 
@@ -392,7 +430,10 @@ function drawChart(s) {
   const pick = today.find(f => f.state === 'signal') || today.slice().sort((a, b) => b.bT - a.bT)[0]
     || prevDay.filter(f => f.state === 'signal' && f.aT >= cs[0].t).pop();
   const fibs = pick ? [pick] : [];
+  const bs = setbOf(day).filter(b => b.level != null);
+  const bPick = bs.find(b => b.state === 'signal') || bs[0];
   const vals = cs.flatMap(c => [c.h, c.l]);
+  if (bPick) vals.push(bPick.level);
   fibs.forEach(f => vals.push(f.A, f.B));
   if (day) vals.push(day.hi, day.lo); sig.forEach(x => { vals.push(x.stop, x.partial); if (x.target) vals.push(x.target); });
   let mx = Math.max(...vals), mn = Math.min(...vals); const pad = (mx - mn) * 0.06 || 1; mx += pad; mn -= pad;
@@ -421,6 +462,10 @@ function drawChart(s) {
     FIB_LEVELS.forEach(lv => ctx.fillText('Fib ' + +(lv * 100).toFixed(1) + '%', W - R + 4, y(f.levels[lv]) + 4));
     if (f.state === 'signal') sig.push(f);
   });
+  if (bPick) {
+    hline(bPick.level, css('--setb'), [8, 3], { srwait: 'S/R (Setup B)', broken: 'S/R broken', retest: 'S/R retest', grabbed: 'S/R retest', signal: 'S/R · Setup B' }[bPick.state]);
+    if (bPick.state === 'signal') sig.push(bPick);
+  }
   const up = css('--buy'), dn = css('--sell');
   cs.forEach((c, i) => {
     const col = c.c >= c.o ? up : dn; ctx.strokeStyle = col; ctx.fillStyle = col;
@@ -434,7 +479,7 @@ function drawChart(s) {
     ctx.fillStyle = sell ? dn : up; ctx.beginPath();
     if (sell) { ctx.moveTo(x(i), yy + 6); ctx.lineTo(x(i) - 6, yy - 4); ctx.lineTo(x(i) + 6, yy - 4); }
     else { ctx.moveTo(x(i), yy - 6); ctx.lineTo(x(i) - 6, yy + 4); ctx.lineTo(x(i) + 6, yy + 4); }
-    ctx.fill(); ctx.font = 'bold 11px Segoe UI'; ctx.fillText((sd.kind === 'fib' ? 'FIB M' : 'M') + sd.model, x(i) + 8, yy + 4);
+    ctx.fill(); ctx.font = 'bold 11px Segoe UI'; ctx.fillText((sd.kind === 'fib' ? 'FIB M' : sd.kind === 'setupB' ? 'B M' : 'M') + sd.model, x(i) + 8, yy + 4);
   });
 }
 
@@ -460,7 +505,7 @@ function tickClock() {
   el.textContent = { asia: 'Asia: building range', london: 'London: liquidity hunt', newyork: 'New York: liquidity hunt', off: 'Outside hunt window' }[s] + (isPrime(now) ? ' · 🔥 Prime hours' : '');
 }
 
-buildGrid(); renderFibBtn(); renderAll(); tickClock();
+buildGrid(); renderFibBtn(); renderSetbBtn(); renderAll(); tickClock();
 refreshAll(true);
 setInterval(tickClock, 15e3);
 setInterval(() => refreshAll(false), 20e3);
