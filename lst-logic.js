@@ -117,9 +117,11 @@ function detectSide(day, side) {
     const base = { side, level: L, grabT: g.t };
     if (model === null) {
       if (!H[gi + 2]) return { ...base, state: 'grabbed' };          // still inside the 3-candle window
-      const after = H.slice(gi + 2);
-      const last = H[H.length - 1];
-      if (!k.closesBack(after[0]) && !k.closesBack(last)) return { ...base, state: 'continuation' };   // Type 1
+      // Type 1 only if price never closed back inside after the grab. This must not depend on the latest candle,
+      // otherwise a later model (re-sweep) would disappear when price moves beyond the level again.
+      let cameBack = false;
+      for (let i = gi + 2; i < H.length && !cameBack; i++) if (k.closesBack(H[i])) cameBack = true;
+      if (!cameBack) return { ...base, state: 'continuation' };       // Type 1
       lastGrab = gi; from = gi + 3;                                   // back inside: wait for a new sweep
       continue;
     }
@@ -399,6 +401,46 @@ function outcome(sig, candles) {
   return { state: half ? 'half' : 'open', halfT };
 }
 
+// ---------- Stop loss by ZONES, never at the wick (LST 2.0 pp. 170-171) ----------
+// SELL: beyond the next resistance (a previous swing high) above the model's wick. BUY: beyond the next support below it.
+// A small margin is added beyond the zone. If there is no zone (e.g. all-time high), wick + margin, flagged.
+const STOP_LOOKBACK = 300;   // candles back to look for S/R zones
+const STOP_PIVOT = 3;        // swing point = extreme vs 3 candles on each side
+const STOP_MARGIN = 0.25;    // margin beyond the zone = 25% of the average candle range
+
+function zoneStop(candles, ci, sell, wick) {
+  const from = Math.max(0, ci - STOP_LOOKBACK);
+  const recent = candles.slice(Math.max(0, ci - 100), ci + 1);
+  const avg = recent.reduce((s, c) => s + (c.h - c.l), 0) / Math.max(1, recent.length);
+  const margin = STOP_MARGIN * avg;
+  let best = null;
+  for (let j = from + STOP_PIVOT; j + STOP_PIVOT <= ci; j++) {   // only swings already confirmed before the model closed
+    const v = sell ? candles[j].h : candles[j].l;
+    let piv = true;
+    for (let k = 1; k <= STOP_PIVOT && piv; k++) {
+      if (sell ? (candles[j - k].h > v || candles[j + k].h > v) : (candles[j - k].l < v || candles[j + k].l < v)) piv = false;
+    }
+    if (!piv) continue;
+    if (sell ? v <= wick + margin * 0.4 : v >= wick - margin * 0.4) continue;   // must be a zone beyond the wick, not the wick itself
+    if (best == null || (sell ? v < best : v > best)) best = v;                 // the nearest one
+  }
+  if (best == null) return { stop: sell ? wick + 2 * margin : wick - 2 * margin, stopKind: 'wick + margin (no zone found)', stopZone: null };
+  return { stop: sell ? best + margin : best - margin, stopKind: 'S/R zone', stopZone: best };
+}
+
+function applyZoneStops(candles, res) {
+  const idx = new Map(candles.map((c, i) => [c.t, i]));
+  for (const d of res) {
+    for (const sd of [].concat(d.sides || [], d.fibs || [], d.setupB || [])) {
+      if (sd.state !== 'signal' || sd.wick != null) continue;
+      const ci = idx.get(sd.confT);
+      if (ci == null) continue;
+      sd.wick = sd.stop;   // the extreme of the wick that took the liquidity (still used for the 50%)
+      Object.assign(sd, zoneStop(candles, ci, sd.dir === 'SELL', sd.wick));
+    }
+  }
+}
+
 function analyze(candles, tfMs) {
   const days = groupDays(candles, tfMs).filter(d => d.asiaOk);
   const out = [];
@@ -414,7 +456,8 @@ function analyze(candles, tfMs) {
     res.setupB = res.sides.map(sd => detectSetupB(d, sd, idx > 0 ? days[idx - 1] : null)).filter(b => b && b.state !== 'invalid');
     out.push(res);
   });
+  applyZoneStops(candles, out);
   return out;   // oldest -> newest
 }
 
-if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, outcome, analyze };
+if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, outcome, zoneStop, analyze };
