@@ -6,6 +6,7 @@ const HUNT_END = 12;                    // grabs are hunted after Asia until 12 
 const PRIME = [[3, 5], [9, 11]];        // "Horarios Prime": London 3-5 AM, New York 9-11 AM (NY time)
 const MOVE_LOOKBACK = 12;               // candles used to find the origin of the move that took the liquidity
 const M1_MIN_WICK = 0.25;               // Model 1: wick on the liquidity side >= 25% of the candle (visible "damage")
+const M1_MIN_DAMAGE = 0.2;              // Model 1: the wick must go past the line by >= 20% of the candle (a graze is not allowed, p.109)
 const M3_MIN_BODY = 1 / 3;              // Model 3: solid body, at least 1/3 of the candle
 const RANGE_LOOKBACK = 10;              // previous Asia ranges used to call today's range small / large
 
@@ -75,7 +76,8 @@ function helpers(sell, L) {
     // Model 1: closes back + rejection: close in the opposite half of the candle + visible wick on the liquidity side
     m1: c => (sell ? c.c < L : c.c > L)
       && (sell ? (c.h - c.c) : (c.c - c.l)) / range(c) >= 0.5
-      && (sell ? c.h - Math.max(c.o, c.c) : Math.min(c.o, c.c) - c.l) / range(c) >= M1_MIN_WICK,
+      && (sell ? c.h - Math.max(c.o, c.c) : Math.min(c.o, c.c) - c.l) / range(c) >= M1_MIN_WICK
+      && (sell ? c.h - L : L - c.l) / range(c) >= M1_MIN_DAMAGE,
     // Model 2 (2.0): engulfing that covers at least 50% of candle #1's body and closes back past the line
     m2: (b, a) => (sell ? b.c < b.o : b.c > b.o) && (sell ? b.c < L : b.c > L)
       && (sell ? b.c <= (a.o + a.c) / 2 : b.c >= (a.o + a.c) / 2),
@@ -381,6 +383,22 @@ function trendInfo(c4h) {
   return { dir, h4: h4.dir, d1: d1.dir, leg };
 }
 
+// ---------- What happened after a signal (LST 2.0 pp. 167, 176-180) ----------
+// Follows the candles after the model closed: stop -> STOPPED; 50% -> partials + stop to break-even;
+// after that, back to entry -> BE; target -> TARGET. If one candle touches stop and target, the stop counts (conservative).
+function outcome(sig, candles) {
+  const sell = sig.dir === 'SELL';
+  let half = false, halfT = null;
+  for (const c of candles) {
+    if (c.t <= sig.confT) continue;
+    const stopLvl = half ? sig.entry : sig.stop;
+    if (sell ? c.h >= stopLvl : c.l <= stopLvl) return { state: half ? 'be' : 'stopped', t: c.t, halfT };
+    if (sig.target != null && (sell ? c.l <= sig.target : c.h >= sig.target)) return { state: 'target', t: c.t, halfT };
+    if (!half && sig.partial != null && (sell ? c.l <= sig.partial : c.h >= sig.partial)) { half = true; halfT = c.t; }
+  }
+  return { state: half ? 'half' : 'open', halfT };
+}
+
 function analyze(candles, tfMs) {
   const days = groupDays(candles, tfMs).filter(d => d.asiaOk);
   const out = [];
@@ -399,4 +417,4 @@ function analyze(candles, tfMs) {
   return out;   // oldest -> newest
 }
 
-if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, analyze };
+if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, outcome, analyze };
