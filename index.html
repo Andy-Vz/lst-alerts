@@ -34,6 +34,11 @@
   #banner .x { margin-left: auto; background: rgba(0,0,0,.25); border: 0; color: inherit; }
   #banner .lvls { font-weight: 400; font-size: 14px; }
 
+  .viewbar { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+  .viewbar label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
+  .viewbar select { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 30px 7px 10px; font: 600 14px "Segoe UI", system-ui, sans-serif; cursor: pointer; }
+  .viewbar select:hover, .viewbar select:focus { border-color: var(--gold); outline: none; }
+  .viewnote { color: var(--muted); font-size: 12px; }
   .grid { display: grid; grid-template-columns: 140px repeat(5, 1fr); gap: 8px; overflow-x: auto; }
   .gh { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; padding: 4px 6px; }
   .inst { display: flex; flex-direction: column; justify-content: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
@@ -107,6 +112,11 @@
   <button onclick="refreshAll(true)" title="Refresh all prices now">⟳ Refresh</button>
 </header>
 <main>
+  <div class="viewbar">
+    <label for="viewSel">Market</label>
+    <select id="viewSel" onchange="setView(this.value)"></select>
+    <span class="viewnote" id="viewNote"></span>
+  </div>
   <div class="grid" id="grid"></div>
 
   <div class="two">
@@ -421,10 +431,10 @@ function buildGrid() {
   const g = document.getElementById('grid');
   g.innerHTML = '<div></div>' + TFS.map(t => `<div class="gh">${t.id}</div>`).join('');
   for (const i of INSTR) {
-    g.insertAdjacentHTML('beforeend', `<div class="inst"><b>${i.name}</b><small id="src-${i.id}"></small><div class="ba" id="ba-${i.id}"></div><div class="trend" id="tr-${i.id}"></div></div>`);
+    g.insertAdjacentHTML('beforeend', `<div class="inst" data-instr="${i.id}"><b>${i.name}</b><small id="src-${i.id}"></small><div class="ba" id="ba-${i.id}"></div><div class="trend" id="tr-${i.id}"></div></div>`);
     for (const t of TFS) {
       const key = i.id + '|' + t.id;
-      g.insertAdjacentHTML('beforeend', `<div class="cell" id="c-${key}" onclick="select('${key}')"></div>`);
+      g.insertAdjacentHTML('beforeend', `<div class="cell" data-instr="${i.id}" id="c-${key}" onclick="select('${key}')"></div>`);
     }
   }
 }
@@ -614,6 +624,27 @@ function tickClock() {
   el.textContent = { asia: 'Asia: building range', london: 'London: liquidity hunt', newyork: 'New York: liquidity hunt', off: 'Outside hunt window' }[s] + (isPrime(now) ? ' · 🔥 Prime hours' : '');
 }
 
+// ---------- market drop-down: view one pair (alerts keep running for all) ----------
+let view = store.get('view', 'all');
+function buildViewSel() {
+  const el = document.getElementById('viewSel');
+  el.innerHTML = INSTR.map(i => `<option value="${i.id}">${i.name}</option>`).join('') + '<option value="all">All markets</option>';
+  if (view !== 'all' && !INSTR.some(i => i.id === view)) view = 'all';
+  el.value = view;
+  if (view !== 'all' && !selected.startsWith(view + '|')) selected = view + '|' + selected.split('|')[1];
+  applyView();
+}
+function setView(v) {
+  view = v; store.set('view', v);
+  if (v !== 'all' && !selected.startsWith(v + '|')) select(v + '|' + selected.split('|')[1]);
+  applyView();
+}
+function applyView() {
+  document.querySelectorAll('#grid [data-instr]').forEach(e => e.style.display = view === 'all' || e.dataset.instr === view ? '' : 'none');
+  const others = INSTR.filter(i => i.id !== view).map(i => i.name);
+  document.getElementById('viewNote').textContent = view === 'all' ? '' : `Alerts still run for ${others.join(' and ')} in the background.`;
+}
+
 // ---------- live price action: Binance WebSocket (bid/ask + the forming candle of every timeframe) ----------
 // Display only. Models are still confirmed on CLOSED candles (the book: never enter before the candle closes).
 const live = {};      // instrId -> { bid, ask, t }
@@ -686,7 +717,7 @@ setInterval(() => {   // batch the screen updates (ticks can arrive many times p
 }, 500);
 setInterval(() => { for (const k in series) liveDirty.add(k); }, 1000);   // keep the countdowns ticking
 
-buildGrid(); renderAsiaBtn(); renderFibBtn(); renderSetbBtn(); renderAll(); tickClock();
+buildGrid(); buildViewSel(); renderAsiaBtn(); renderFibBtn(); renderSetbBtn(); renderAll(); tickClock();
 connectLive();
 refreshAll(true);
 setInterval(tickClock, 15e3);
