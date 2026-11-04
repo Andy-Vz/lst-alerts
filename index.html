@@ -249,6 +249,9 @@ async function fetchBinance(sym, tf) {
   const r = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${tf.bn}&limit=400`);
   if (!r.ok) throw new Error('Binance HTTP ' + r.status);
   const a = await r.json(), now = Date.now();
+  const open = a.find(k => k[6] >= now);   // the candle still forming: seed the live view right away
+  const key = INSTR.find(i => i.bn === sym).id + '|' + tf.id;
+  if (open && (!forming[key] || forming[key].t <= open[0])) { forming[key] = { t: open[0], o: +open[1], h: +open[2], l: +open[3], c: +open[4] }; liveDirty.add(key); }
   return a.filter(k => k[6] < now).map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }));
 }
 async function fetchTD(sym, tf) {
@@ -606,6 +609,9 @@ function connectLive() {
   const ins = liveInstr();
   if (!ins.length) { wsOk = false; renderLiveStatus(); return; }
   const streams = ins.flatMap(i => [i.bn.toLowerCase() + '@bookTicker'].concat(TFS.map(t => `${i.bn.toLowerCase()}@kline_${t.bn}`)));
+  // seed bid/ask immediately (the stream only sends when the order book changes, which can take a while on PAXG)
+  fetch('https://data-api.binance.vision/api/v3/ticker/bookTicker?symbols=' + encodeURIComponent(JSON.stringify(ins.map(i => i.bn))))
+    .then(r => r.json()).then(a => { for (const d of a) { const i = INSTR.find(x => x.bn === d.symbol); if (i && !live[i.id]) { live[i.id] = { bid: +d.bidPrice, ask: +d.askPrice, t: Date.now() }; for (const t of TFS) liveDirty.add(i.id + '|' + t.id); } } }).catch(() => {});
   ws = new WebSocket('wss://data-stream.binance.vision/stream?streams=' + streams.join('/'));
   ws.onopen = () => { wsOk = true; wsRetry = 1000; renderLiveStatus(); };
   ws.onclose = () => { wsOk = false; renderLiveStatus(); setTimeout(connectLive, wsRetry); wsRetry = Math.min(wsRetry * 2, 30000); };
