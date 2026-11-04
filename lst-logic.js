@@ -134,7 +134,9 @@ function detectSide(day, side) {
     return {
       ...base, state: 'signal', model, confT: conf.t, entry: conf.c,
       stop, origin, partial, target: targetOk ? target : null, dir: sell ? 'SELL' : 'BUY',
-      partialPassed: sell ? conf.c <= partial : conf.c >= partial   // model closed already at/after the 50% (LST 2.0 p.176)
+      partialPassed: sell ? conf.c <= partial : conf.c >= partial,  // model closed already at/after the 50% (LST 2.0 p.176)
+      // Model 1 variant 4 (p.108): body closes right at the line, big wick -> may only reach the 50%
+      m1weak: model === 1 && Math.abs(conf.c - L) / Math.max(conf.h - conf.l, 1e-12) < 0.15
     };
   }
 }
@@ -331,6 +333,54 @@ function detectSetupB(day, sd, prevDay) {
   return { ...base, state: inZoneNow ? 'retest' : 'broken', level, breakT: X[bi].t };
 }
 
+// ---------- Higher-timeframe trend from price structure (LST 2.0 pp. 103, 149, 172-175) ----------
+// No indicators: higher highs + higher lows = up, lower highs + lower lows = down, otherwise range.
+const TREND_PIVOT = 3;
+
+function structure(c) {
+  const hs = [], ls = [];
+  for (let j = TREND_PIVOT; j + TREND_PIVOT < c.length; j++) {
+    let isH = true, isL = true;
+    for (let k = 1; k <= TREND_PIVOT; k++) {
+      if (c[j].h <= c[j - k].h || c[j].h < c[j + k].h) isH = false;
+      if (c[j].l >= c[j - k].l || c[j].l > c[j + k].l) isL = false;
+    }
+    if (isH) hs.push({ i: j, v: c[j].h });
+    if (isL) ls.push({ i: j, v: c[j].l });
+  }
+  if (hs.length < 2 || ls.length < 2) return { dir: 'range' };
+  const [h1, h2] = hs.slice(-2), [l1, l2] = ls.slice(-2);
+  const last = c[c.length - 1];
+  let dir = h2.v > h1.v && l2.v > l1.v ? 'up' : h2.v < h1.v && l2.v < l1.v ? 'down' : 'range';
+  if (dir === 'up' && last.c < l2.v) dir = 'range';     // structure broken since the last swing
+  if (dir === 'down' && last.c > h2.v) dir = 'range';
+  // the last leg of the trend (used for the counter-trend take profit at 50% / 61.8%)
+  let leg = null;
+  if (dir === 'up') leg = { lo: l2.v, hi: Math.max(...c.slice(l2.i).map(x => x.h)) };
+  if (dir === 'down') leg = { hi: h2.v, lo: Math.min(...c.slice(h2.i).map(x => x.l)) };
+  return { dir, leg };
+}
+
+function toDaily(c) {
+  const m = new Map();
+  for (const x of c) {
+    const d = tradingDay(x.t);
+    const g = m.get(d);
+    if (!g) m.set(d, { t: x.t, o: x.o, h: x.h, l: x.l, c: x.c });
+    else { g.h = Math.max(g.h, x.h); g.l = Math.min(g.l, x.l); g.c = x.c; }
+  }
+  return [...m.values()];
+}
+
+// Trend for an instrument from its 4h candles: daily structure first, H4 if the daily is ranging.
+function trendInfo(c4h) {
+  if (!c4h || c4h.length < 30) return null;
+  const h4 = structure(c4h), d1 = structure(toDaily(c4h));
+  const dir = d1.dir !== 'range' ? d1.dir : h4.dir;
+  const leg = h4.dir === dir && h4.leg ? h4.leg : d1.leg;
+  return { dir, h4: h4.dir, d1: d1.dir, leg };
+}
+
 function analyze(candles, tfMs) {
   const days = groupDays(candles, tfMs).filter(d => d.asiaOk);
   const out = [];
@@ -349,4 +399,4 @@ function analyze(candles, tfMs) {
   return out;   // oldest -> newest
 }
 
-if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, analyze };
+if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, analyze };
