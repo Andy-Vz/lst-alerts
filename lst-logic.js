@@ -139,6 +139,97 @@ function detectSide(day, side) {
   }
 }
 
+// ---------- v2: Fibonacci pullbacks + internal liquidity (LST 2.0 pp. 97, 138-144) ----------
+// Once the direction is known (a confirmed model, or Type 1 continuation through the Asia level), the impulse
+// runs from its origin A to its extreme B. In the pullback we wait in the Fibonacci zone (>= 50%, best 61.8-78.6%)
+// for price to take an internal liquidity point (a swing low/high inside the move, or the first buyers/sellers
+// of the correction) and confirm one of the same 3 models in favour of the trend.
+const FIB_MIN = 0.5;                       // pullback must reach at least the 50%
+const FIB_LEVELS = [0.5, 0.618, 0.7, 0.786];
+const PIVOT = 2;                           // swing point = extreme vs 2 candles on each side
+const MIN_IMPULSE = 3;                     // impulse must be >= 3x the average candle range of the day
+
+function fibZone(d) { return d < 0.618 ? '50%' : d <= 0.786 ? 'Golden zone' : 'Deep (>78.6%)'; }
+
+function detectFib(day, sd) {
+  if (sd.state !== 'signal' && sd.state !== 'continuation') return null;
+  const X = day.seq.concat(day.post);
+  const buy = sd.state === 'signal' ? sd.dir === 'BUY' : sd.side === 'sell';   // Type 1 above the Asia high = bullish
+  const sell = !buy;
+  const dir = buy ? 'BUY' : 'SELL';
+  const ext = c => buy ? c.h : c.l;        // impulse side
+  const pull = c => buy ? c.l : c.h;       // pullback side
+  const beyond = (a, b) => buy ? a > b : a < b;
+  const gi = X.findIndex(c => c.t === sd.grabT);
+  if (gi < 0) return null;
+
+  let A, aIdx, start;
+  if (sd.state === 'signal') {
+    const ci = X.findIndex(c => c.t === sd.confT);
+    A = sd.stop; aIdx = gi; for (let j = gi; j <= ci; j++) if (pull(X[j]) === A) aIdx = j;
+    start = ci;
+  } else {
+    aIdx = Math.max(0, gi - MOVE_LOOKBACK);   // origin of the move that broke the level
+    for (let j = aIdx; j <= gi; j++) if (beyond(pull(X[aIdx]), pull(X[j]))) aIdx = j;
+    A = pull(X[aIdx]);
+    start = gi;
+  }
+  let B = ext(X[aIdx]), bIdx = aIdx;
+  for (let j = aIdx; j <= start; j++) if (beyond(ext(X[j]), B)) { B = ext(X[j]); bIdx = j; }
+
+  const avgRange = X.reduce((s, c) => s + (c.h - c.l), 0) / X.length;
+  const depthOf = v => (B - v) / (B - A);   // works for both directions (A and B swap sides)
+  const out = { kind: 'fib', side: sd.side, dir, source: sd.state === 'signal' ? 'model' : 'type1', A, aT: X[aIdx].t };
+  const levels = () => Object.fromEntries(FIB_LEVELS.map(f => [f, B - f * (B - A)]));
+  let state = 'impulse', lastDepth = 0;
+
+  for (let i = start + 1; i < X.length; i++) {
+    const c = X[i];
+    if (!beyond(pull(c), A)) return   // pullback reached the origin: the impulse is invalid { ...out, B, bT: X[bIdx].t, levels: levels(), state: 'invalid' };
+    if (beyond(ext(c), B)) { B = ext(c); bIdx = i; state = 'impulse'; continue; }   // new leg of the impulse
+    if (Math.abs(B - A) < MIN_IMPULSE * avgRange) continue;
+    const depth = depthOf(pull(c));
+    lastDepth = depth;
+    if (depth < FIB_MIN) continue;
+    state = 'zone';
+
+    // liquidity points: swing extremes (pullback side) between A and now, not taken yet, sitting between A and B
+    const pts = [];
+    for (let j = aIdx + PIVOT; j + PIVOT <= i - 1; j++) {
+      const v = pull(X[j]);
+      let piv = true;
+      for (let k = 1; k <= PIVOT && piv; k++) if (!beyond(pull(X[j - k]), v) || !beyond(pull(X[j + k]), v)) piv = false;
+      if (!piv || !beyond(v, A) || !beyond(B, v)) continue;
+      let taken = false;
+      for (let k = j + 1; k < i && !taken; k++) if (beyond(v, pull(X[k]))) taken = true;
+      if (!taken && beyond(v, pull(c))) pts.push({ v, t: X[j].t, internal: j < bIdx });
+    }
+    if (!pts.length) continue;
+    const P = pts.reduce((a, b) => beyond(a.v, b.v) ? b : a);   // deepest point taken by this candle
+    const k = helpers(sell, P.v);
+    let model = null, ci = -1;
+    if (k.m1(c)) { model = 1; ci = i; }
+    else if (X[i + 1] && k.m2(X[i + 1], c)) { model = 2; ci = i + 1; }
+    else if (X[i + 2] && k.m3(X[i + 2])) { model = 3; ci = i + 2; }
+    if (model === null) {
+      if (!X[i + 2]) return { ...out, B, bT: X[bIdx].t, levels: levels(), state: 'grabbed', point: P.v, depth, zone: fibZone(depth) };
+      continue;
+    }
+    const span = X.slice(i, ci + 1);
+    const stop = buy ? Math.min(...span.map(x => x.l)) : Math.max(...span.map(x => x.h));
+    const conf = X[ci];
+    const partial = (stop + B) / 2;   // 50% of the pullback move that took the liquidity
+    return {
+      ...out, B, bT: X[bIdx].t, levels: levels(), state: 'signal', model, grabT: c.t, confT: conf.t, entry: conf.c,
+      stop, partial, partialPassed: buy ? conf.c >= partial : conf.c <= partial,
+      target: beyond(B, conf.c) ? B : null, point: P.v, pointKind: P.internal ? 'internal liquidity' : 'first ' + (buy ? 'sellers' : 'buyers') + ' of the pullback',
+      depth: depthOf(stop), zone: fibZone(depthOf(stop))
+    };
+  }
+  if (Math.abs(B - A) < MIN_IMPULSE * avgRange) state = 'small';   // impulse still too small to measure
+  return { ...out, B, bT: X[bIdx].t, levels: levels(), state, depth: lastDepth };
+}
+
 function analyze(candles, tfMs) {
   const days = groupDays(candles, tfMs).filter(d => d.asiaOk);
   const out = [];
@@ -150,9 +241,10 @@ function analyze(candles, tfMs) {
     const rangeSize = ratio == null ? null : ratio < 0.75 ? 'small' : ratio > 1.3 ? 'large' : 'normal';
     const res = { day: d.key, hi: d.hi, lo: d.lo, asiaDone, rangeRatio: ratio, rangeSize, asiaCandles: d.asia.map(c => c.t), sides: [] };
     if (asiaDone) res.sides = [detectSide(d, 'sell'), detectSide(d, 'buy')];
+    res.fibs = res.sides.map(sd => detectFib(d, sd)).filter(f => f && f.state !== 'invalid' && f.state !== 'small');
     out.push(res);
   });
   return out;   // oldest -> newest
 }
 
-if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, analyze };
+if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, analyze };
