@@ -24,6 +24,8 @@
   button.on { border-color: var(--buy); color: var(--buy); }
   #fibBtn.on { border-color: var(--fib); color: var(--fib); }
   #setbBtn.on { border-color: var(--setb); color: var(--setb); }
+  #asiaBtn.on { border-color: var(--info); color: var(--info); }
+  button.tg:not(.on) { color: var(--muted); text-decoration: line-through; opacity: .75; }
   main { padding: 18px 20px 40px; max-width: 1400px; margin: 0 auto; }
 
   #banner { display: none; position: sticky; top: 0; z-index: 10; padding: 14px 20px; font-size: 17px; font-weight: 600; align-items: center; gap: 16px; }
@@ -97,9 +99,10 @@
   <span class="sess" id="sess">—</span>
   <span class="livedot off" id="liveDot">○ connecting…</span>
   <span class="spacer"></span>
-  <button id="soundBtn" onclick="toggleSound()">🔇 Sound off</button>
-  <button id="fibBtn" onclick="toggleFib()"></button>
-  <button id="setbBtn" onclick="toggleSetb()"></button>
+  <button id="soundBtn" class="tg" onclick="toggleSound()" title="Turn alert sounds on / off">🔇 Sound</button>
+  <button id="asiaBtn" class="tg" onclick="toggleAsia()"></button>
+  <button id="fibBtn" class="tg" onclick="toggleFib()"></button>
+  <button id="setbBtn" class="tg" onclick="toggleSetb()"></button>
   <button onclick="testAlert()" title="Play a test alert">🔔 Test</button>
   <button onclick="refreshAll(true)" title="Refresh all prices now">⟳ Refresh</button>
 </header>
@@ -111,8 +114,8 @@
       <h2 id="chartTitle">Chart</h2>
       <canvas id="chart"></canvas>
       <div class="legend">
-        <span><i style="background:var(--info);opacity:.5;height:10px"></i>Asia session</span>
-        <span><i style="background:var(--gold)"></i>Asia high / low (liquidity $$$)</span>
+        <span class="asiaLeg"><i style="background:var(--info);opacity:.5;height:10px"></i>Asia session</span>
+        <span class="asiaLeg"><i style="background:var(--gold)"></i>Asia high / low (liquidity $$$)</span>
         <span><i style="background:var(--sell)"></i>Stop (add margin)</span>
         <span><i style="background:var(--buy)"></i>50%: partials + break-even</span>
         <span><i style="background:var(--info)"></i>Target (next liquidity)</span>
@@ -186,10 +189,24 @@ function toggleFib() {
 }
 function renderFibBtn() {
   const b = document.getElementById('fibBtn');
-  b.textContent = fibOn ? '📐 Fib on' : '📐 Fib off';
+  b.textContent = '📐 Fib';
   b.title = 'Show / hide Fibonacci pullback setups and their alerts';
   b.classList.toggle('on', fibOn);
   document.getElementById('fibLegend').style.display = fibOn ? '' : 'none';
+}
+let asiaOn = store.get('asia', true);
+const sidesOf = day => asiaOn && day && day.sides ? day.sides : [];
+function toggleAsia() {
+  asiaOn = !asiaOn; store.set('asia', asiaOn); renderAsiaBtn();
+  if (asiaOn) for (const k in series) if (!series[k].loading) checkSignals(k);
+  renderAll();
+}
+function renderAsiaBtn() {
+  const b = document.getElementById('asiaBtn');
+  b.textContent = '🌏 Asia';
+  b.title = 'Show / hide the Asia range setups (Asia high/low grabs + Models 1-3) and their alerts. ' + (asiaOn ? 'Now ON' : 'Now OFF');
+  b.classList.toggle('on', asiaOn);
+  document.querySelectorAll('.asiaLeg').forEach(e => e.style.display = asiaOn ? '' : 'none');
 }
 let setbOn = store.get('setb', true);
 const setbOf = day => setbOn && day && day.setupB ? day.setupB : [];
@@ -200,7 +217,7 @@ function toggleSetb() {
 }
 function renderSetbBtn() {
   const b = document.getElementById('setbBtn');
-  b.textContent = setbOn ? '🔁 B on' : '🔁 B off';
+  b.textContent = '🔁 B';
   b.title = 'Show / hide Setup B (broken S/R + retest) and its alerts';
   b.classList.toggle('on', setbOn);
   document.getElementById('setbLegend').style.display = setbOn ? '' : 'none';
@@ -312,7 +329,7 @@ function checkSignals(key) {
   const s = series[key]; const c = s.candles;
   if (!trendFor(s.instr.id)) return;   // wait for the 4h data (trend) before recording signals; re-run when it arrives
   for (const day of s.res.slice(-4)) {
-    const sigs = day.sides.map(sd => ({ sd, id: `${key}|${day.day}|${sd.side}` }))
+    const sigs = sidesOf(day).map(sd => ({ sd, id: `${key}|${day.day}|${sd.side}` }))
       .concat(fibsOf(day).map(sd => ({ sd, id: `${key}|${day.day}|fib-${sd.dir}` })))
       .concat(setbOf(day).map(sd => ({ sd, id: `${key}|${day.day}|setb-${sd.dir}` })));
     for (const { sd, id } of sigs) {
@@ -349,7 +366,7 @@ function toggleSound() {
   soundOn = !soundOn;
   if (soundOn && !audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const b = document.getElementById('soundBtn');
-  b.textContent = soundOn ? '🔊 Sound on' : '🔇 Sound off';
+  b.textContent = soundOn ? '🔊 Sound' : '🔇 Sound';
   b.classList.toggle('on', soundOn);
   if (soundOn) beep('BUY');
 }
@@ -371,7 +388,7 @@ function statusFor(s) {
   if (!day) return [['wait', '—', 'Not enough data yet']];
   if (day.day !== today) return [['wait', 'CLOSED', 'Market closed / no session data today']];
   if (!day.asiaDone) return [['wait', 'ASIA', 'Building Asia range…']];
-  return day.sides.map(sd => {
+  return sidesOf(day).map(sd => {
     const lvl = sd.side === 'sell' ? 'Asia high' : 'Asia low';
     switch (sd.state) {
       case 'signal': return [sd.dir, sd.dir + ' M' + sd.model, `Model ${sd.model} confirmed at ${fmtNY(sd.confT + s.tf.ms).split(', ')[1]} NY${isPrime(sd.confT + s.tf.ms) ? ' 🔥 PRIME' : ''}${sigCtx(s, sd)}`];
@@ -424,7 +441,7 @@ function renderCell(key) {
   el.innerHTML = `
     <div class="row1"><span class="price" id="px-${key}">${fmtP(last && last.c, dp)}</span><span class="age">last close ${last ? fmtNY(last.t + s.tf.ms).split(', ')[1] : ''}</span></div>
     <div class="live" id="lv-${key}"></div>
-    <div class="lv">Asia H ${fmtP(day && day.hi, dp)} · L ${fmtP(day && day.lo, dp)}${day && day.rangeSize ? ` · <span class="rs ${day.rangeSize}">${{ small: 'small range', normal: 'normal range', large: 'large range' }[day.rangeSize]}</span>` : ''}</div>
+    <div class="lv" style="${asiaOn ? '' : 'display:none'}">Asia H ${fmtP(day && day.hi, dp)} · L ${fmtP(day && day.lo, dp)}${day && day.rangeSize ? ` · <span class="rs ${day.rangeSize}">${{ small: 'small range', normal: 'normal range', large: 'large range' }[day.rangeSize]}</span>` : ''}</div>
     ${sts.map(([cls, tag, txt]) => `<div class="st"><span class="tag ${cls}">${tag}</span><span>${txt}</span></div>`).join('')}`;
   document.getElementById('src-' + s.instr.id).textContent = s.source || '';
   renderLive(key);
@@ -435,7 +452,7 @@ function renderCell(key) {
 function renderAll() { for (const k in series) renderCell(k); renderDetail(); renderHistory(); renderSrc(); }
 
 function renderHistory() {
-  const rows = sigHist.filter(r => (fibOn || !r.fib) && (setbOn || !r.setb));
+  const rows = sigHist.filter(r => (fibOn || !r.fib) && (setbOn || !r.setb) && (asiaOn || r.fib || r.setb));
   document.getElementById('hist').innerHTML = rows.length ? rows.map(r =>
     `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? 'FIB ' : r.setb ? 'B ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}${r.trend === 'with' ? ' ✅' : r.trend === 'against' ? ' ⚠️' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td>${fmtP(r.partial, r.dp)}</td><td class="${r.rr != null && r.rr < 2 ? 'rrlow' : ''}">${r.rr != null ? '1:' + r.rr.toFixed(1) : '—'}</td></tr>`
   ).join('') : '<tr><td colspan="8" style="color:var(--muted)">No signals yet.</td></tr>';
@@ -453,7 +470,7 @@ function renderDetail() {
   const day = s.res[s.res.length - 1], dp = s.instr.dp, d = document.getElementById('detail');
   if (!day) { d.innerHTML = ''; return; }
   const rsTxt = { small: 'small (compressed energy: best days)', normal: 'normal', large: 'large (energy spent in Asia: London may be slow or only reach 50%)' };
-  let html = `<div>Trading day <b>${day.day}</b> · Asia high <b>${fmtP(day.hi, dp)}</b> · Asia low <b>${fmtP(day.lo, dp)}</b>${day.rangeSize ? ` · Range <b>${rsTxt[day.rangeSize]}</b> (${day.rangeRatio.toFixed(2)}× the 10-day average)` : ''}</div>`;
+  let html = !asiaOn ? `<div>Trading day <b>${day.day}</b> · Asia range hidden (🌏 Asia is off)</div>` : `<div>Trading day <b>${day.day}</b> · Asia high <b>${fmtP(day.hi, dp)}</b> · Asia low <b>${fmtP(day.lo, dp)}</b>${day.rangeSize ? ` · Range <b>${rsTxt[day.rangeSize]}</b> (${day.rangeRatio.toFixed(2)}× the 10-day average)` : ''}</div>`;
   const tr = trendFor(s.instr.id);
   if (tr) html += `<div>Higher-timeframe trend: <b>${{ up: 'up ↑', down: 'down ↓', range: 'ranging ↔' }[tr.dir]}</b> (daily ${ARROW[tr.d1]} · H4 ${ARROW[tr.h4]}, from highs/lows structure)</div>`;
   const ctxHtml = (sd) => {
@@ -470,7 +487,7 @@ function renderDetail() {
     if (tc.ctTarget) return ` · Target (counter-trend: 50% of the last move) <b>${fmtP(tc.target, dp)}</b>${tc.tp2 ? `, then 61.8% <b>${fmtP(tc.tp2, dp)}</b>` : ''}`;
     return ` · Target (${label}) <b>${fmtP(tc.target, dp)}</b>`;
   };
-  for (const sd of day.sides) if (sd.state === 'signal')
+  for (const sd of sidesOf(day)) if (sd.state === 'signal')
     html += `<div><span class="tag ${sd.dir}">${sd.dir} · Model ${sd.model}</span>${isPrime(sd.confT + s.tf.ms) ? ' 🔥 PRIME' : ''} Entry ~<b>${fmtP(sd.entry, dp)}</b> · Stop beyond <b>${fmtP(sd.stop, dp)}</b> (add margin) · ${sd.partialPassed ? '50% already reached when the model closed: manage toward the target' : `50%: take 25–50% partials + move to BE at <b>${fmtP(sd.partial, dp)}</b>`}${tgtHtml(sd, 'next liquidity')}${ctxHtml(sd)}</div>`;
   for (const f of fibsOf(day)) {
     const lv = f.levels, gz = `<b>${fmtP(lv[0.618], dp)}</b> – <b>${fmtP(lv[0.786], dp)}</b>`;
@@ -503,7 +520,7 @@ function drawChart(s) {
   if (!cs.length) return;
   const lv = live[s.instr.id] && !useTD(s.instr) ? live[s.instr.id] : null;
   const day = s.res[s.res.length - 1];
-  const sig = day ? day.sides.filter(x => x.state === 'signal') : [];
+  const sig = sidesOf(day).filter(x => x.state === 'signal');
   // draw one Fibonacci only: today's signal > today's active setup (newest) > yesterday's signal if still on screen
   const today = fibsOf(day).filter(f => f.aT >= cs[0].t), prevDay = s.res.length > 1 ? fibsOf(s.res[s.res.length - 2]) : [];
   const pick = today.find(f => f.state === 'signal') || today.slice().sort((a, b) => b.bT - a.bT)[0]
@@ -514,10 +531,10 @@ function drawChart(s) {
   const vals = cs.flatMap(c => [c.h, c.l]);
   if (bPick) vals.push(bPick.level);
   fibs.forEach(f => vals.push(f.A, f.B));
-  if (day) vals.push(day.hi, day.lo); sig.forEach(x => { vals.push(x.stop, x.partial); if (x.target) vals.push(x.target); });
+  if (day && asiaOn) vals.push(day.hi, day.lo); sig.forEach(x => { vals.push(x.stop, x.partial); if (x.target) vals.push(x.target); });
   let mx = Math.max(...vals), mn = Math.min(...vals); const pad = (mx - mn) * 0.06 || 1; mx += pad; mn -= pad;
   const R = 104, cw = (W - R) / n, y = v => (mx - v) / (mx - mn) * (H - 10) + 5, x = i => i * cw + cw / 2;
-  const asiaSet = new Set(day ? day.asiaCandles : []);
+  const asiaSet = new Set(day && asiaOn ? day.asiaCandles : []);
   ctx.fillStyle = 'rgba(88,166,255,.10)';
   cs.forEach((c, i) => { if (asiaSet.has(c.t)) ctx.fillRect(i * cw, 0, cw + .5, H); });
   const hline = (v, col, dash, label) => {
@@ -525,7 +542,7 @@ function drawChart(s) {
     ctx.fillStyle = col; ctx.font = '11px Segoe UI'; ctx.fillText(label, W - R + 4, y(v) + 4);
   };
   const isTgt = v => sig.some(sd => sd.target === v);
-  if (day) { hline(day.hi, css('--gold'), [6, 4], 'Asia H $$$' + (isTgt(day.hi) ? ' · Target' : '')); hline(day.lo, css('--gold'), [6, 4], 'Asia L $$$' + (isTgt(day.lo) ? ' · Target' : '')); }
+  if (day && asiaOn) { hline(day.hi, css('--gold'), [6, 4], 'Asia H $$$' + (isTgt(day.hi) ? ' · Target' : '')); hline(day.lo, css('--gold'), [6, 4], 'Asia L $$$' + (isTgt(day.lo) ? ' · Target' : '')); }
   sig.forEach(sd => { hline(sd.stop, css('--sell'), [2, 3], 'Stop'); if (!sd.partialPassed) hline(sd.partial, css('--buy'), [2, 3], '50% BE'); const tg = tradeCtx(s, sd).target; if (tg != null && tg !== day.hi && tg !== day.lo) hline(tg, css('--info'), [2, 3], 'Target'); });
   fibs.forEach(f => {
     const fc = css('--fib'), ia = cs.findIndex(c => c.t >= f.aT), ib = Math.max(0, cs.findIndex(c => c.t >= f.bT)), xs = Math.max(0, ia) * cw;
@@ -669,7 +686,7 @@ setInterval(() => {   // batch the screen updates (ticks can arrive many times p
 }, 500);
 setInterval(() => { for (const k in series) liveDirty.add(k); }, 1000);   // keep the countdowns ticking
 
-buildGrid(); renderFibBtn(); renderSetbBtn(); renderAll(); tickClock();
+buildGrid(); renderAsiaBtn(); renderFibBtn(); renderSetbBtn(); renderAll(); tickClock();
 connectLive();
 refreshAll(true);
 setInterval(tickClock, 15e3);
