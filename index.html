@@ -126,7 +126,7 @@
     <label for="viewSel">Market</label>
     <select id="viewSel" onchange="setView(this.value)"></select>
     <span class="viewnote" id="viewNote"></span>
-    <label class="staronly" title="5-year backtest after costs: Fib pullbacks on Gold and EUR/USD were the only setup positive in both 2021-23 and 2024-26 (+0.10R per trade, 78% winners with the 50% + BE management)"><input type="checkbox" id="starOnly" onchange="setStarOnly(this.checked)"> 🔔 Alert me only for ⭐ signals (Fib on Gold / EUR/USD)</label>
+    <label class="staronly" title="Only alert Fibonacci pullback signals. Note: on 5 years of real prices no setup had a reliable edge after costs"><input type="checkbox" id="starOnly" onchange="setStarOnly(this.checked)"> 🔔 Alert me only for ⭐ Fib signals</label>
   </div>
   <div class="grid" id="grid"></div>
 
@@ -179,14 +179,14 @@
     <p><b>Setup B, the second chance</b> (LST 2.0 pp. 182–186): after a confirmed model, the page finds the nearest S/R in the trade's direction (swing points before the model and the previous day's high/low). (A) Price must break it <b>with force</b> (a strong candle closing through it). (B) Price comes back to retest that zone with <b>weaker, corrective candles</b>. (C) A model confirms there, at the S/R line, an internal liquidity point or the first buyers/sellers of the retest. The page shows the risk:reward and flags anything below <b>1:2</b>, where the book says to skip the trade.</p>
     <p><b>Backtest, 5 years (Nov 2021 – Nov 2026, Gold/EUR/USD/Bitcoin stand-ins, 15m–4h, stop by zones, half at the 50% + BE, rest at the target, no costs)</b>: about 3 of 4 signals reached the 50% (no loss). <b>⭐ Fibonacci pullbacks</b> were the only setup positive every year (+0.02R to +0.15R per trade, +0.08R average); Asia and Setup B were close to break-even. Signals whose model closed already past the target (<b>⛔ no target</b>) lost 98% of the time, so the page marks them and does not alert them. Past results do not guarantee future results; this is not financial advice.</p>
     <p><b>📈 Trend lines</b> (LST 2.0 pp. 61–66, 103, 126): a trend line is a dynamic S/R joining at least two swing points (higher lows for a rising line, lower highs for a falling one) that no candle has closed through. The book says never to enter on the 2nd point: wait for price to move away with speed and come back with a corrective pullback, then look for Model 1, 2 or 3 at the next touch (touch #3 or later). A line with 3+ touches broken by a strong candle is watched for a retest from the other side. A touch counts within 30% of an average candle of the line. <b>Shown as context only, never alerted</b>: in the 5-year backtest the touch models were about break-even (+0.02R per trade before costs, −0.05R after) and the retests lost (−0.01R before costs, −0.09R after).</p>
-    <p><b>Costs</b> (backtest, assumed spread + commission per trade: Gold $0.30, EUR/USD 1 pip, Bitcoin 0.08%): after costs every setup is slightly negative overall. The only one still positive is <b>⭐ Fib on Gold (+0.06R) and EUR/USD (+0.11R)</b>. On Bitcoin the costs remove any edge.</p>
-    <p><b>Filters from the backtest</b> (5 years, checked separately in 2021–23 and 2024–26 so they are not luck): (1) <b>Weekends</b>: Gold and EUR/USD are closed Friday 5 PM – Sunday 6 PM NY, but the Binance stand-ins keep trading, so models in that window are shown as CLOSED and never alerted. (2) <b>⛔ Stop too tight</b>: when the spread + commission is more than 10% of the risk, the trade lost −0.12R to −0.36R on average, so it is flagged and not alerted. (3) <b>⭐ only for Fib on Gold and EUR/USD</b>: +0.13R (2021–23) and +0.08R (2024–26) per trade after costs, 78% winners; Bitcoin Fib was not positive after costs. "Alert me only for ⭐" is on by default. (4) Tested and <b>not</b> added as alerts because they were break-even: London range high/low hunted in New York, yesterday's high/low (PDH/PDL), swing liquidity on S/R zones, trend lines.</p>
+    <p><b>Real prices (important)</b>: the earlier backtests used the Binance stand-ins. Re-run on <b>5 years of real 1-minute prices</b> (Gold, EUR/USD, USD/JPY, GBP/USD, GBP/JPY; spread + commission per trade: Gold $0.30, EUR/USD 1 pip, USD/JPY 1.2 pips, GBP/USD 1.4 pips, GBP/JPY 2.5 pips), with the page's stops and management: <b>no setup has a reliable edge after costs</b>. Fib: Gold −0.06R, EUR/USD −0.05R, USD/JPY +0.05R, GBP/USD +0.05R, GBP/JPY −0.01R per trade (about 300 trades each, too few to trust the small positives). Asia and Setup B were negative on all five. The page finds the book's models; it does not make them profitable. Past results do not guarantee future results; this is not financial advice.</p>
+    <p><b>Filters from the backtest</b> (5 years, checked separately in 2021–23 and 2024–26 so they are not luck): (1) <b>Weekends</b>: Gold and EUR/USD are closed Friday 5 PM – Sunday 6 PM NY, but the Binance stand-ins keep trading, so models in that window are shown as CLOSED and never alerted. (2) <b>⛔ Stop too tight</b>: when the spread + commission is more than 10% of the risk, the trade lost −0.12R to −0.36R on average, so it is flagged and not alerted. (3) <b>⭐ marks Fib pullback signals</b> (not on Bitcoin, where costs are higher). With the stand-ins they looked positive, with real prices they did not (see above). (4) Tested and <b>not</b> added as alerts because they were break-even: London range high/low hunted in New York, yesterday's high/low (PDH/PDL), swing liquidity on S/R zones, trend lines.</p>
     <p>Not automated yet (needs your eye): Asia-session prime models (8–10 PM NY), the Asia range used as S/R after Type 1, and high-impact news (avoid trading right before NFP, CPI and FOMC). This page only sends alerts. It never places trades.</p>
   </details>
 </main>
 
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="lst-logic.js?v=12"></script>
+<script src="lst-logic.js?v=13"></script>
 <script>
 const INSTR = [
   { id: 'XAU', name: 'Gold', td: 'XAU/USD', bn: 'PAXGUSDT', dp: 2, cost: () => 0.30, weekend: true },
@@ -323,7 +323,7 @@ const TIGHT_COST = 0.10;
 const costShare = (s, sd) => s.instr.cost(sd.entry) / Math.max(Math.abs(sd.entry - sd.stop), 1e-12);
 const tight = (s, sd) => costShare(s, sd) > TIGHT_COST;
 const TIGHTTXT = (s, sd) => `<span class="res stop">⛔ stop too tight: costs = ${Math.round(100 * costShare(s, sd))}% of the risk</span>`;
-// ⭐ = the only setup that stayed positive after costs in both halves of the backtest: Fib on Gold and EUR/USD
+// ⭐ = Fib pullback signal (not on Bitcoin, not too tight). Real-price backtest: no setup has a reliable edge after costs.
 const isStar = (s, sd) => sd.kind === 'fib' && s.instr.id !== 'BTC' && !tight(s, sd);
 // Gold and forex are closed Friday 17:00 -> Sunday 18:00 NY; the Binance stand-ins keep trading, so those signals are not real
 const nyWk = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', hour12: false });
@@ -359,8 +359,32 @@ async function fetchBinance(sym, tf) {
   if (open && (!forming[key] || forming[key].t <= open[0])) { forming[key] = { t: open[0], o: +open[1], h: +open[2], l: +open[3], c: +open[4] }; liveDirty.add(key); }
   return a.filter(k => k[6] < now).map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }));
 }
-async function fetchTD(sym, tf) {
-  const r = await fetch(`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=${tf.td}&outputsize=400&timezone=UTC&order=ASC&apikey=${encodeURIComponent(apiKey)}`);
+// One request per pair per 15 minutes (15m) and per hour (1h); 30m comes from 15m, 2h and 4h from 1h.
+// That is ~120 requests a day per instrument (Gold + EUR/USD = ~240), well inside the free plan (800/day, 8/minute).
+const tdBase = {};   // "XAU|15m" -> { c: candles, at: fetch time }
+let tdFetched = false;
+function aggCandles(c, ms, baseMs) {
+  const out = []; let cur = null;
+  for (const x of c) {
+    const b = Math.floor(x.t / ms) * ms;
+    if (!cur || cur.t !== b) { if (cur) out.push(cur); cur = { t: b, o: x.o, h: x.h, l: x.l, c: x.c }; }
+    else { cur.h = Math.max(cur.h, x.h); cur.l = Math.min(cur.l, x.l); cur.c = x.c; }
+  }
+  const last = c[c.length - 1];
+  if (cur && last && cur.t + ms <= last.t + baseMs) out.push(cur);   // only buckets that are fully closed
+  return out;
+}
+async function candlesTD(instr, tf) {
+  const base = tf.ms <= 30 * 60e3 ? TFS[0] : TFS[2];   // 15m or 1h
+  const key = instr.id + '|' + base.id, now = Date.now(), cache = tdBase[key];
+  const lastClosed = Math.floor(now / base.ms) * base.ms - base.ms;
+  let c;
+  if (cache && (cache.c.length && cache.c[cache.c.length - 1].t >= lastClosed || now - cache.at < base.ms)) c = cache.c;
+  else { c = await fetchTD(instr.td, base, base.id === '15m' ? 800 : 1600); tdBase[key] = { c, at: now }; tdFetched = true; }
+  return (tf.ms === base.ms ? c : aggCandles(c, tf.ms, base.ms)).slice(-400);
+}
+async function fetchTD(sym, tf, size = 400) {
+  const r = await fetch(`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=${tf.td}&outputsize=${size}&timezone=UTC&order=ASC&apikey=${encodeURIComponent(apiKey)}`);
   const j = await r.json();
   if (j.status === 'error' || !j.values) throw new Error('Twelve Data: ' + (j.message || 'no data'));
   const now = Date.now();
@@ -373,8 +397,9 @@ function enqueueTD(key) { if (!tdQueue.includes(key)) tdQueue.push(key); pumpTD(
 async function pumpTD() {
   if (tdBusy) return; tdBusy = true;
   while (tdQueue.length) {
+    tdFetched = false;
     await load(tdQueue.shift());
-    if (tdQueue.length) await new Promise(r => setTimeout(r, 9000));   // free plan: max 8 requests/min
+    if (tdQueue.length && tdFetched) await new Promise(r => setTimeout(r, 9000));   // free plan: max 8 requests/min
   }
   tdBusy = false;
 }
@@ -382,8 +407,9 @@ async function pumpTD() {
 async function load(key) {
   const s = series[key]; const { instr, tf } = s;
   try {
+    if (!instr.bn && !useTD(instr)) { s.source = 'needs a Twelve Data key'; throw new Error(`${instr.name} needs a free Twelve Data key: paste it in "Data source" below.`); }
     s.source = useTD(instr) ? `Twelve Data ${instr.td}` : `Binance ${instr.bn}`;
-    const c = useTD(instr) ? await fetchTD(instr.td, tf) : await fetchBinance(instr.bn, tf);
+    const c = useTD(instr) ? await candlesTD(instr, tf) : await fetchBinance(instr.bn, tf);
     s.candles = c; s.error = null; s.loading = false; s.fetchedAt = Date.now();
     s.res = analyze(c, tf.ms);
     if (instr.weekend && !useTD(instr)) for (const d of s.res) {
@@ -400,7 +426,7 @@ async function load(key) {
       if (k !== key && !series[k].loading && !series[k].error) { checkSignals(k); renderCell(k); }
     }
   } catch (e) {
-    s.error = e.message; s.loading = false; s.nextDue = Date.now() + 2 * 60e3;
+    s.error = e.message; s.loading = false; s.nextDue = Date.now() + (!instr.bn && !useTD(instr) ? 864e5 : 2 * 60e3);
   }
   renderCell(key);
   if (key === selected) renderDetail();
@@ -774,7 +800,7 @@ function tickClock() {
 }
 
 // ---------- market drop-down: view one pair (alerts keep running for all) ----------
-let starOnly = store.get('staronly', true);
+let starOnly = store.get('staronly', false);
 function setStarOnly(v) { starOnly = v; store.set('staronly', v); }
 let view = store.get('view', 'all');
 function buildViewSel() {
@@ -801,7 +827,7 @@ function applyView() {
 const live = {};      // instrId -> { bid, ask, t }
 const forming = {};   // "XAU|15m" -> forming candle { t, o, h, l, c }
 let ws = null, wsOk = false, wsRetry = 1000, liveDirty = new Set(), chartDirty = false;
-const liveInstr = () => INSTR.filter(i => !useTD(i));   // with a Twelve Data key, Gold/EUR candles are real forex: don't mix in Binance stand-in ticks
+const liveInstr = () => INSTR.filter(i => i.bn && !useTD(i));   // with a Twelve Data key, Gold/EUR candles are real forex: don't mix in Binance stand-in ticks
 
 function connectLive() {
   if (ws) { try { ws.onclose = null; ws.close(); } catch {} ws = null; }
