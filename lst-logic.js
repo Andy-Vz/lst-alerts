@@ -569,6 +569,105 @@ function detectTrendlines(X) {
   return { signals, lines };
 }
 
+// ---------- Liquidity + S/R zone (LST 2.0 p.103 "the 4 places"; how Mr.LQDT trades in his channel) ----------
+// $$$ = an old swing high/low (often equal highs/lows) that price has not taken yet. When a candle sweeps it AND it
+// sits on an S/R zone (a price where the market already turned at least ZONE_MIN_REACT times before), a Model 1/2/3
+// at that level is the signal - at any hour, not only around the Asia range.
+// Stop: beyond the next S/R zone (pp.170-171). Target: the next opposite $$$ still untaken, far enough for 1:LQ_MIN_RR.
+const LQ = {
+  PIVOT: 3,            // swing point that holds liquidity (stops behind it)
+  LOOKBACK: 150,       // how old that swing may be (candles)
+  ZONE_PIVOT: 5,       // bigger swing points used to find S/R zones
+  ZONE_LOOKBACK: 400,  // candles back to look for those reactions
+  ZONE_TOL: 0.5,       // a reaction counts if within 50% of an average candle of the level
+  ZONE_MIN_REACT: 2,   // earlier reactions needed for the level to be a zone
+  MIN_RR: 1.5,         // target: first opposite liquidity at >= 1:1.5 with the zone stop (else: no target)
+};
+
+function detectLiquidity(X, opt = {}) {
+  const P = Object.assign({}, LQ, opt), n = X.length, signals = [];
+  if (n < 50) return signals;
+  const pre = [0]; for (const c of X) pre.push(pre[pre.length - 1] + (c.h - c.l));
+  const avgAt = i => { const a = Math.max(0, i - 99); return (pre[i + 1] - pre[a]) / (i + 1 - a); };
+  const isPiv = (j, p, hi) => {
+    if (j - p < 0 || j + p >= n) return false;
+    const v = hi ? X[j].h : X[j].l;
+    for (let k = 1; k <= p; k++) {
+      if (hi ? (X[j - k].h >= v || X[j + k].h > v) : (X[j - k].l <= v || X[j + k].l < v)) return false;
+    }
+    return true;
+  };
+  const liq = { hi: [], lo: [] };       // untaken swing points (the $$$)
+  const zp = [];                         // zone reactions: {i, v} of both swing highs and lows (S/R flips)
+  const pend = { hi: null, lo: null };
+
+  for (let i = 0; i < n; i++) {
+    const c = X[i], avg = avgAt(i), ztol = P.ZONE_TOL * avg;
+    // newly confirmed swing points (only what was knowable at this candle)
+    const j = i - P.PIVOT;
+    if (j >= 0) {
+      if (isPiv(j, P.PIVOT, true)) liq.hi.push({ i: j, v: X[j].h });
+      if (isPiv(j, P.PIVOT, false)) liq.lo.push({ i: j, v: X[j].l });
+    }
+    const jz = i - P.ZONE_PIVOT;
+    if (jz >= 0) {
+      if (isPiv(jz, P.ZONE_PIVOT, true)) zp.push({ i: jz, v: X[jz].h });
+      if (isPiv(jz, P.ZONE_PIVOT, false)) zp.push({ i: jz, v: X[jz].l });
+    }
+    while (zp.length && i - zp[0].i > P.ZONE_LOOKBACK) zp.shift();
+
+    for (const side of ['hi', 'lo']) {
+      const sell = side === 'hi';
+      // a sweep waiting for its model (same 3 models and 3-candle window as everywhere else)
+      const p = pend[side];
+      if (p) {
+        const k = helpers(sell, p.level);
+        const model = i === p.gi + 1 && k.m2(c, X[p.gi]) ? 2 : i === p.gi + 2 && k.m3(c) ? 3 : null;
+        if (model) signals.push(build(p, i, model, sell));
+        if (model || i >= p.gi + 2) pend[side] = null;
+      }
+      // liquidity this candle takes
+      const L = liq[side];
+      while (L.length && i - L[0].i > P.LOOKBACK) L.shift();
+      const swept = L.filter(s => s.i + P.PIVOT < i && (sell ? c.h > s.v : c.l < s.v));
+      if (!swept.length) continue;
+      liq[side] = L.filter(s => !swept.includes(s));          // taken: that $$$ is gone
+      if (pend[side]) continue;
+      const S = swept.reduce((a, b) => sell ? (b.v > a.v ? b : a) : (b.v < a.v ? b : a));   // the furthest level taken
+      // S/R zone: other reactions (already confirmed swing points, not the swing itself) around that price
+      const react = zp.filter(z => z.i !== S.i && Math.abs(z.v - S.v) <= ztol).length;
+      if (react < P.ZONE_MIN_REACT) continue;
+      const equal = swept.filter(s => Math.abs(s.v - S.v) <= ztol).length;   // equal highs / lows = more $$$
+      pend[side] = { gi: i, level: S.v, swingT: X[S.i].t, react, equal };
+      const k = helpers(sell, S.v);
+      if (k.m1(c)) { signals.push(build(pend[side], i, 1, sell)); pend[side] = null; }
+    }
+  }
+  return signals;
+
+  function build(p, ci, model, sell) {
+    const conf = X[ci], span = X.slice(p.gi, ci + 1);
+    const wick = sell ? Math.max(...span.map(x => x.h)) : Math.min(...span.map(x => x.l));
+    const zs = zoneStop(X, ci, sell, wick);
+    const risk = Math.abs(conf.c - zs.stop);
+    // origin of the move that took the liquidity (for the book's 50%)
+    const before = X.slice(Math.max(0, p.gi - MOVE_LOOKBACK), p.gi + 1);
+    const origin = sell ? Math.min(...before.map(x => x.l)) : Math.max(...before.map(x => x.h));
+    // opposite liquidity still untaken at the close of the model candle, nearest first
+    const opp = (sell ? liq.lo : liq.hi).filter(s => s.i + P.PIVOT <= ci && (sell ? s.v < conf.c : s.v > conf.c))
+      .map(s => s.v).sort((a, b) => Math.abs(a - conf.c) - Math.abs(b - conf.c));
+    const target = opp.find(v => Math.abs(v - conf.c) >= P.MIN_RR * risk);
+    const partial = (wick + origin) / 2;
+    return {
+      kind: 'lq', side: sell ? 'sell' : 'buy', dir: sell ? 'SELL' : 'BUY', state: 'signal', model,
+      grabT: X[p.gi].t, confT: conf.t, entry: conf.c, level: p.level, swingT: p.swingT, react: p.react, equal: p.equal,
+      wick, ...zs, origin, partial, partialPassed: sell ? conf.c <= partial : conf.c >= partial,
+      target: target != null ? target : null, nearestOpp: opp.length ? opp[0] : null, opp,
+      m1weak: model === 1 && Math.abs(conf.c - p.level) / Math.max(conf.h - conf.l, 1e-12) < 0.15
+    };
+  }
+}
+
 function analyze(candles, tfMs) {
   const days = groupDays(candles, tfMs).filter(d => d.asiaOk);
   const out = [];
@@ -593,4 +692,4 @@ function analyze(candles, tfMs) {
   return out;   // oldest -> newest
 }
 
-if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, outcome, zoneStop, detectTrendlines, analyze };
+if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, outcome, zoneStop, detectTrendlines, detectLiquidity, LQ, analyze };

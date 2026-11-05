@@ -126,7 +126,7 @@
     <label for="viewSel">Market</label>
     <select id="viewSel" onchange="setView(this.value)"></select>
     <span class="viewnote" id="viewNote"></span>
-    <label class="staronly" title="In 5 years of backtest, Fibonacci pullbacks were the only setup positive every year (+0.08R per trade on average)"><input type="checkbox" id="starOnly" onchange="setStarOnly(this.checked)"> 🔔 Alert me only for ⭐ signals (Fib)</label>
+    <label class="staronly" title="5-year backtest after costs: Fib pullbacks on Gold and EUR/USD were the only setup positive in both 2021-23 and 2024-26 (+0.10R per trade, 78% winners with the 50% + BE management)"><input type="checkbox" id="starOnly" onchange="setStarOnly(this.checked)"> 🔔 Alert me only for ⭐ signals (Fib on Gold / EUR/USD)</label>
   </div>
   <div class="grid" id="grid"></div>
 
@@ -180,17 +180,18 @@
     <p><b>Backtest, 5 years (Nov 2021 – Nov 2026, Gold/EUR/USD/Bitcoin stand-ins, 15m–4h, stop by zones, half at the 50% + BE, rest at the target, no costs)</b>: about 3 of 4 signals reached the 50% (no loss). <b>⭐ Fibonacci pullbacks</b> were the only setup positive every year (+0.02R to +0.15R per trade, +0.08R average); Asia and Setup B were close to break-even. Signals whose model closed already past the target (<b>⛔ no target</b>) lost 98% of the time, so the page marks them and does not alert them. Past results do not guarantee future results; this is not financial advice.</p>
     <p><b>📈 Trend lines</b> (LST 2.0 pp. 61–66, 103, 126): a trend line is a dynamic S/R joining at least two swing points (higher lows for a rising line, lower highs for a falling one) that no candle has closed through. The book says never to enter on the 2nd point: wait for price to move away with speed and come back with a corrective pullback, then look for Model 1, 2 or 3 at the next touch (touch #3 or later). A line with 3+ touches broken by a strong candle is watched for a retest from the other side. A touch counts within 30% of an average candle of the line. <b>Shown as context only, never alerted</b>: in the 5-year backtest the touch models were about break-even (+0.02R per trade before costs, −0.05R after) and the retests lost (−0.01R before costs, −0.09R after).</p>
     <p><b>Costs</b> (backtest, assumed spread + commission per trade: Gold $0.30, EUR/USD 1 pip, Bitcoin 0.08%): after costs every setup is slightly negative overall. The only one still positive is <b>⭐ Fib on Gold (+0.06R) and EUR/USD (+0.11R)</b>. On Bitcoin the costs remove any edge.</p>
-    <p>Not automated yet (needs your eye): models at previous day/week highs and lows, Asia-session prime models (8–10 PM NY) and the Asia range used as S/R after Type 1. This page only sends alerts. It never places trades.</p>
+    <p><b>Filters from the backtest</b> (5 years, checked separately in 2021–23 and 2024–26 so they are not luck): (1) <b>Weekends</b>: Gold and EUR/USD are closed Friday 5 PM – Sunday 6 PM NY, but the Binance stand-ins keep trading, so models in that window are shown as CLOSED and never alerted. (2) <b>⛔ Stop too tight</b>: when the spread + commission is more than 10% of the risk, the trade lost −0.12R to −0.36R on average, so it is flagged and not alerted. (3) <b>⭐ only for Fib on Gold and EUR/USD</b>: +0.13R (2021–23) and +0.08R (2024–26) per trade after costs, 78% winners; Bitcoin Fib was not positive after costs. "Alert me only for ⭐" is on by default. (4) Tested and <b>not</b> added as alerts because they were break-even: London range high/low hunted in New York, yesterday's high/low (PDH/PDL), swing liquidity on S/R zones, trend lines.</p>
+    <p>Not automated yet (needs your eye): Asia-session prime models (8–10 PM NY), the Asia range used as S/R after Type 1, and high-impact news (avoid trading right before NFP, CPI and FOMC). This page only sends alerts. It never places trades.</p>
   </details>
 </main>
 
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="lst-logic.js?v=11"></script>
+<script src="lst-logic.js?v=12"></script>
 <script>
 const INSTR = [
-  { id: 'XAU', name: 'Gold', td: 'XAU/USD', bn: 'PAXGUSDT', dp: 2 },
-  { id: 'EUR', name: 'EUR/USD', td: 'EUR/USD', bn: 'EURUSDT', dp: 5 },
-  { id: 'BTC', name: 'Bitcoin', td: null, bn: 'BTCUSDT', dp: 1 },
+  { id: 'XAU', name: 'Gold', td: 'XAU/USD', bn: 'PAXGUSDT', dp: 2, cost: () => 0.30, weekend: true },
+  { id: 'EUR', name: 'EUR/USD', td: 'EUR/USD', bn: 'EURUSDT', dp: 5, cost: () => 0.0001, weekend: true },
+  { id: 'BTC', name: 'Bitcoin', td: null, bn: 'BTCUSDT', dp: 1, cost: p => p * 0.0008, weekend: false },
 ];
 const TFS = [
   { id: '15m', ms: 15 * 60e3, td: '15min', bn: '15m' },
@@ -313,10 +314,25 @@ const resultOf = (s, sd) => outcome({ dir: sd.dir, entry: sd.entry, stop: sd.sto
 const finished = o => o && (o.state === 'stopped' || o.state === 'target' || o.state === 'be');
 const resTag = o => o ? `<span class="res ${RES[o.state][0]}">${RES[o.state][1]}</span>` : '<span class="ctx">—</span>';
 const noTarget = (s, sd) => tradeCtx(s, sd).target == null;   // backtest: 98% of signals without a target lost -> don't take them
-const sigCls = (s, sd) => finished(resultOf(s, sd)) || noTarget(s, sd) ? 'done ' + sd.dir : sd.dir;   // finished / no-target signals are not highlighted
+const sigCls = (s, sd) => finished(resultOf(s, sd)) || noTarget(s, sd) || tight(s, sd) ? 'done ' + sd.dir : sd.dir;   // finished / no-target / too-tight signals are not highlighted
 const stopTxt = (sd, dp) => `Stop <b>${fmtP(sd.stop, dp)}</b> ${sd.stopZone != null ? `(beyond the S/R zone ${fmtP(sd.stopZone, dp)}, not the wick ${fmtP(sd.wick, dp)})` : '(no S/R zone found: wick + margin)'}`;
 const NOTGT = '<span class="res stop">⛔ no target: do not take</span>';
-const sigCtx = (s, sd) => { const tc = tradeCtx(s, sd); const p = [noTarget(s, sd) ? NOTGT : resTag(resultOf(s, sd)), trendTxt(tc.trend), rrTxt(tc.rr)].filter(Boolean); return `<br><span class="ctx">${p.join(' · ')}</span>`; };
+// Backtest (5 years, both halves 2021-23 and 2024-26): trades whose spread + commission is more than 10% of the risk
+// lost -0.12R to -0.36R per trade, so they are flagged and never alerted.
+const TIGHT_COST = 0.10;
+const costShare = (s, sd) => s.instr.cost(sd.entry) / Math.max(Math.abs(sd.entry - sd.stop), 1e-12);
+const tight = (s, sd) => costShare(s, sd) > TIGHT_COST;
+const TIGHTTXT = (s, sd) => `<span class="res stop">⛔ stop too tight: costs = ${Math.round(100 * costShare(s, sd))}% of the risk</span>`;
+// ⭐ = the only setup that stayed positive after costs in both halves of the backtest: Fib on Gold and EUR/USD
+const isStar = (s, sd) => sd.kind === 'fib' && s.instr.id !== 'BTC' && !tight(s, sd);
+// Gold and forex are closed Friday 17:00 -> Sunday 18:00 NY; the Binance stand-ins keep trading, so those signals are not real
+const nyWk = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', hour12: false });
+function marketClosed(t) {
+  const p = {}; for (const x of nyWk.formatToParts(new Date(t))) p[x.type] = x.value;
+  const h = +p.hour % 24;
+  return p.weekday === 'Sat' || (p.weekday === 'Fri' && h >= 17) || (p.weekday === 'Sun' && h < 18);
+}
+const sigCtx = (s, sd) => { const tc = tradeCtx(s, sd); const p = [noTarget(s, sd) ? NOTGT : tight(s, sd) ? TIGHTTXT(s, sd) : resTag(resultOf(s, sd)), trendTxt(tc.trend), rrTxt(tc.rr)].filter(Boolean); return `<br><span class="ctx">${p.join(' · ')}</span>`; };
 function recResult(r) {
   const s = Object.values(series).find(x => x.instr.name === r.inst && x.tf.id === r.tf);
   if (!s || !s.candles.length) return null;
@@ -370,6 +386,10 @@ async function load(key) {
     const c = useTD(instr) ? await fetchTD(instr.td, tf) : await fetchBinance(instr.bn, tf);
     s.candles = c; s.error = null; s.loading = false; s.fetchedAt = Date.now();
     s.res = analyze(c, tf.ms);
+    if (instr.weekend && !useTD(instr)) for (const d of s.res) {
+      for (const sd of d.sides || []) if (sd.state === 'signal' && marketClosed(sd.confT)) sd.state = 'weekend';
+      for (const k of ['fibs', 'setupB', 'tl', 'lq']) if (d[k]) d[k] = d[k].filter(sd => !(sd.state === 'signal' && marketClosed(sd.confT)));
+    }
     const last = c[c.length - 1];
     let due = last ? last.t + 2 * tf.ms + 20e3 : Date.now() + 60e3;
     if (due <= Date.now()) due = Date.now() + Math.min(tf.ms, 15 * 60e3);   // market closed / stale data
@@ -410,12 +430,13 @@ function checkSignals(key) {
       seen.add(id);
       const tc = tradeCtx(s, sd);
       const rec = { id, t: sd.confT + s.tf.ms, inst: s.instr.name, tf: s.tf.id, dir: sd.dir, model: sd.model, entry: sd.entry, stop: sd.stop, stopZone: sd.stopZone, partial: sd.partialPassed ? null : sd.partial, target: tc.target, rr: tc.rr, trend: tc.trend, ctTarget: tc.ctTarget, m1weak: sd.m1weak, prime: isPrime(sd.confT + s.tf.ms), dp: s.instr.dp };
-      if (sd.kind === 'fib') Object.assign(rec, { fib: true, zone: sd.zone, depth: sd.depth, pointKind: sd.pointKind });
+      if (sd.kind === 'fib') Object.assign(rec, { fib: true, star: isStar(s, sd), zone: sd.zone, depth: sd.depth, pointKind: sd.pointKind });
+      if (tight(s, sd)) Object.assign(rec, { tight: true, costPct: Math.round(100 * costShare(s, sd)) });
       if (sd.kind === 'setupB') Object.assign(rec, { setb: true, level: sd.level, pointKind: sd.pointKind });
       sigHist.unshift(rec);
       const fresh = Date.now() - (sd.confT + s.tf.ms) <= s.tf.ms;   // alert only if the model candle closed less than one candle ago
       if (tc.target == null) rec.noTarget = true;
-      if (fresh && !rec.noTarget && (!starOnly || rec.fib)) fireAlert(rec);
+      if (fresh && !rec.noTarget && !rec.tight && (!starOnly || rec.star)) fireAlert(rec);
     }
   }
   sigHist.sort((a, b) => b.t - a.t); sigHist = sigHist.slice(0, 80);
@@ -426,7 +447,7 @@ function checkSignals(key) {
 function fireAlert(r) {
   const b = document.getElementById('banner');
   b.className = 'show ' + r.dir;
-  document.getElementById('bannerText').textContent = `${r.fib ? '⭐ ' : ''}${r.prime ? '🔥 PRIME · ' : ''}${r.dir} · ${r.inst} ${r.tf} · ${r.fib ? `Fib pullback Model ${r.model} (${r.zone} ${Math.round(r.depth * 100)}%, ${r.pointKind})` : r.setb ? `Setup B Model ${r.model} (retest of broken S/R ${fmtP(r.level, r.dp)})` : `Model ${r.model} confirmed`} (candle closed ${fmtNY(r.t)} NY)${r.trend ? ' · ' + trendTxt(r.trend) : ''}`;
+  document.getElementById('bannerText').textContent = `${r.star ? '⭐ ' : ''}${r.prime ? '🔥 PRIME · ' : ''}${r.dir} · ${r.inst} ${r.tf} · ${r.fib ? `Fib pullback Model ${r.model} (${r.zone} ${Math.round(r.depth * 100)}%, ${r.pointKind})` : r.setb ? `Setup B Model ${r.model} (retest of broken S/R ${fmtP(r.level, r.dp)})` : `Model ${r.model} confirmed`} (candle closed ${fmtNY(r.t)} NY)${r.trend ? ' · ' + trendTxt(r.trend) : ''}`;
   document.getElementById('bannerLv').textContent = `Entry ~${fmtP(r.entry, r.dp)} · Stop ${fmtP(r.stop, r.dp)}${r.stopZone != null ? ' (beyond S/R zone ' + fmtP(r.stopZone, r.dp) + ')' : ' (no zone: wick + margin)'} · 50% partials + BE ${r.partial == null ? 'already passed' : fmtP(r.partial, r.dp)}` + (r.target ? ` · Target ${fmtP(r.target, r.dp)}${r.ctTarget ? ' (counter-trend: 50% of the last move)' : ''}` : '')
     + (r.rr != null ? ` · ${rrTxt(r.rr)}${r.rr < 2 ? ' below 1:2: the book says skip' : ''}` : '') + (r.m1weak ? ' · ⚠️ M1 closed right at the line: may only reach the 50%' : '');
   document.title = `🔔 ${r.dir} ${r.inst} ${r.tf}`;
@@ -460,7 +481,7 @@ function statusFor(s) {
   const day = s.res.length ? s.res[s.res.length - 1] : null;
   if (!day) return [['wait', '—', 'Not enough data yet']];
   if (day.day !== today) return [['wait', 'CLOSED', 'Market closed / no session data today']];
-  if (!day.asiaDone) return [['wait', 'ASIA', 'Building Asia range…']].concat(tlRows(s));
+  if (!day.asiaDone) return [['wait', 'ASIA', 'Building Asia range…']].concat(fibIdle(day), tlRows(s));
   return sidesOf(day).map(sd => {
     const lvl = sd.side === 'sell' ? 'Asia high' : 'Asia low';
     switch (sd.state) {
@@ -468,12 +489,13 @@ function statusFor(s) {
       case 'grabbed': return ['grab', 'GRAB', `${lvl} taken: waiting for confirmation`];
       case 'continuation': return ['cont', 'TYPE 1', `${lvl} broken: continuation, no reversal`];
       case 'nomodel': return ['wait', 'NO MODEL', `${lvl} taken, no valid model`];
+      case 'weekend': return ['wait', 'CLOSED', 'Model on the weekend: the real market was closed (stand-in data only)'];
       default: return ['wait', 'WAIT', `${lvl} not taken yet`];
     }
   }).concat(fibsOf(day).map(f => {
     const dp = s.instr.dp, gz = `${fmtP(f.levels[0.618], dp)}–${fmtP(f.levels[0.786], dp)}`;
     switch (f.state) {
-      case 'signal': return [sigCls(s, f), '⭐ FIB ' + f.dir + ' M' + f.model, `Pullback Model ${f.model} in ${f.zone} at ${fmtNY(f.confT + s.tf.ms).split(', ')[1]} NY${isPrime(f.confT + s.tf.ms) ? ' 🔥 PRIME' : ''}${sigCtx(s, f)}`];
+      case 'signal': return [sigCls(s, f), (isStar(s, f) ? '⭐ ' : '') + 'FIB ' + f.dir + ' M' + f.model, `Pullback Model ${f.model} in ${f.zone} at ${fmtNY(f.confT + s.tf.ms).split(', ')[1]} NY${isPrime(f.confT + s.tf.ms) ? ' 🔥 PRIME' : ''}${sigCtx(s, f)}`];
       case 'grabbed': return ['grab', 'FIB', `${f.dir} pullback took liquidity in ${f.zone}: waiting confirmation`];
       case 'zone': return ['fib', 'FIB ZONE', `${f.dir} pullback at ${Math.round(f.depth * 100)}%: watch liquidity points`];
       default: return ['wait', 'FIB', `${f.dir} impulse · Golden zone ${gz}`];
@@ -487,8 +509,15 @@ function statusFor(s) {
       case 'broken': return ['setb', 'SETUP B', `S/R ${lv} broken with force: waiting for the retest`];
       default: return ['wait', 'SETUP B', `Next S/R ${lv}: waiting for a strong break`];
     }
-  })).concat(tlRows(s));
+  })).concat(fibIdle(day), tlRows(s));
 }
+// when Fib is on but there is no Fib setup today, say why (so an empty cell is not mistaken for a broken page)
+const fibIdle = day => {
+  if (!fibOn || fibsOf(day).length) return [];
+  if (!day.asiaDone) return [['wait', 'FIB', 'Fib: waits for a model after Asia closes (2:00 AM NY)']];
+  const sig = (day.sides || []).some(sd => sd.state === 'signal' || sd.state === 'continuation');
+  return [['wait', 'FIB', sig ? 'Fib: the move after the model was too small or already cancelled' : 'Fib: waiting for an Asia model or a Type 1 to measure the impulse']];
+};
 const tlRows = s => shownLines(s).filter(l => l.state !== 'forming').map(l => [l.state === 'broken' ? 'tlf' : 'tl', 'TL ' + (l.dir === 'up' ? '↑' : '↓'), `${tlName(l)}: ${tlState(l, s.instr.dp)}`]);
 
 function buildGrid() {
@@ -528,7 +557,7 @@ function renderAll() { for (const k in series) renderCell(k); renderDetail(); re
 function renderHistory() {
   const rows = sigHist.filter(r => (fibOn || !r.fib) && (setbOn || !r.setb) && (asiaOn || r.fib || r.setb));
   document.getElementById('hist').innerHTML = rows.length ? rows.map(r =>
-    `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? '⭐ FIB ' : r.setb ? 'B ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}${r.trend === 'with' ? ' ✅' : r.trend === 'against' ? ' ⚠️' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td class="${r.rr != null && r.rr < 2 ? 'rrlow' : ''}">${r.rr != null ? '1:' + r.rr.toFixed(1) : '—'}</td><td>${r.noTarget ? NOTGT : resTag(recResult(r))}</td></tr>`
+    `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? (r.star || r.star == null && r.inst !== 'Bitcoin' ? '⭐ ' : '') + 'FIB ' : r.setb ? 'B ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}${r.trend === 'with' ? ' ✅' : r.trend === 'against' ? ' ⚠️' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td class="${r.rr != null && r.rr < 2 ? 'rrlow' : ''}">${r.rr != null ? '1:' + r.rr.toFixed(1) : '—'}</td><td>${r.noTarget ? NOTGT : r.tight ? `<span class="res stop">⛔ stop too tight (costs ${r.costPct}% of risk)</span>` : resTag(recResult(r))}</td></tr>`
   ).join('') : '<tr><td colspan="8" style="color:var(--muted)">No signals yet.</td></tr>';
 }
 
@@ -549,7 +578,7 @@ function renderDetail() {
   if (tr) html += `<div>Higher-timeframe trend: <b>${{ up: 'up ↑', down: 'down ↓', range: 'ranging ↔' }[tr.dir]}</b> (daily ${ARROW[tr.d1]} · H4 ${ARROW[tr.h4]}, from highs/lows structure)</div>`;
   const ctxHtml = (sd) => {
     const tc = tradeCtx(s, sd);
-    let h = ` · Result: ${tc.target == null ? NOTGT + ' (the model closed already past the target; in the backtest 98% of these lost)' : resTag(resultOf(s, sd))}`;
+    let h = ` · Result: ${tc.target == null ? NOTGT + ' (the model closed already past the target; in the backtest 98% of these lost)' : tight(s, sd) ? TIGHTTXT(s, sd) + ' (in the backtest these lost on average: not alerted)' : resTag(resultOf(s, sd))}`;
     if (tc.trend) h += ` · <b>${trendTxt(tc.trend)}</b>`;
     if (tc.rr != null) h += ` · <span class="${tc.rr < 2 ? 'rrlow' : ''}">R:R 1:${tc.rr.toFixed(1)}${tc.rr < 2 ? ' (book: skip below 1:2)' : ''}</span>`;
     if (sd.m1weak) h += ` · <span class="rrlow">⚠️ Model 1 closed right at the line: may only reach the 50%</span>`;
@@ -745,7 +774,7 @@ function tickClock() {
 }
 
 // ---------- market drop-down: view one pair (alerts keep running for all) ----------
-let starOnly = store.get('staronly', false);
+let starOnly = store.get('staronly', true);
 function setStarOnly(v) { starOnly = v; store.set('staronly', v); }
 let view = store.get('view', 'all');
 function buildViewSel() {
