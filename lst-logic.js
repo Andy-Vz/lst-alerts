@@ -431,7 +431,7 @@ function zoneStop(candles, ci, sell, wick) {
 function applyZoneStops(candles, res) {
   const idx = new Map(candles.map((c, i) => [c.t, i]));
   for (const d of res) {
-    for (const sd of [].concat(d.sides || [], d.fibs || [], d.setupB || [])) {
+    for (const sd of [].concat(d.sides || [], d.fibs || [], d.setupB || [], d.tl || [])) {
       if (sd.state !== 'signal' || sd.wick != null) continue;
       const ci = idx.get(sd.confT);
       if (ci == null) continue;
@@ -439,6 +439,134 @@ function applyZoneStops(candles, res) {
       Object.assign(sd, zoneStop(candles, ci, sd.dir === 'SELL', sd.wick));
     }
   }
+}
+
+// ---------- Trend lines (LST 2.0 pp. 61-66, 103, 126) ----------
+// A trend line is a dynamic S/R: at least 2 swing points joined by a line that price respects.
+// The book: never enter on the 2nd point; wait for speed away from the line and a corrective pullback, then a
+// Model 1/2/3 at the NEXT touch (3rd point or later) = BOUNCE. When a line with 3+ touches breaks with force,
+// price usually comes back to retest it from the other side: a model there = RETEST (the trade goes the other way).
+const TL_PIVOT = 3;          // swing point = extreme vs 3 candles on each side
+const TL_MIN_GAP = 5;        // candles between the two points that start a line
+const TL_MAX_SPAN = 200;     // a line older than this (from its first point) is dropped
+const TL_TOL = 0.3;          // touch zone around the line = 30% of the average candle range
+const TL_AWAY = 3;           // after a touch price must move away >= 3 average candles before the next touch counts
+const TL_RETEST_MAX = 30;    // candles after the break to get the retest
+const TL_MAX_LINES = 3;      // lines kept per direction
+
+function detectTrendlines(X) {
+  const n = X.length, signals = [], lines = [];
+  if (n < 30) return { signals, lines };
+  const pre = [0]; for (const c of X) pre.push(pre[pre.length - 1] + (c.h - c.l));
+  const avgAt = i => { const a = Math.max(0, i - 99); return (pre[i + 1] - pre[a]) / (i + 1 - a); };
+  const body = c => Math.abs(c.c - c.o), range = c => Math.max(c.h - c.l, 1e-12);
+  const avgBody = (a, b) => { let s = 0, k = 0; for (let j = a; j <= b; j++) { s += body(X[j]); k++; } return k ? s / k : 0; };
+  const piv = { up: [], down: [] };            // confirmed swing lows (for rising lines) / highs (for falling lines)
+  const act = { up: [], down: [] };
+  const val = (L, i) => L.v1 + L.slope * (i - L.i1);
+
+  for (let i = 0; i < n; i++) {
+    const tol = TL_TOL * avgAt(i);
+    // 1. a swing point confirmed now (TL_PIVOT candles later) -> new line or touch of an existing one
+    const j = i - TL_PIVOT;
+    if (j >= TL_PIVOT) for (const dir of ['up', 'down']) {
+      const lowSide = dir === 'up', v = lowSide ? X[j].l : X[j].h;
+      let ok = true;
+      for (let k = 1; k <= TL_PIVOT && ok; k++) ok = lowSide ? (X[j - k].l > v && X[j + k].l >= v) : (X[j - k].h < v && X[j + k].h <= v);
+      if (!ok) continue;
+      const P = piv[dir];
+      while (P.length && j - P[0].i > TL_MAX_SPAN) P.shift();
+      const onLine = act[dir].some(L => L.state === 'active' && Math.abs(val(L, j) - v) <= tol);
+      if (!onLine) {
+        // the oldest earlier point that makes a line no candle crossed in between (rising: higher low; falling: lower high)
+        for (const q of P) {
+          if (j - q.i < TL_MIN_GAP || (lowSide ? q.v >= v : q.v <= v)) continue;
+          const slope = (v - q.v) / (j - q.i);
+          let clean = true;
+          for (let k = q.i + 1; k <= i && clean; k++) {
+            const lv = q.v + slope * (k - q.i);
+            clean = lowSide ? X[k].l >= lv - tol && X[k].c >= lv - tol : X[k].h <= lv + tol && X[k].c <= lv + tol;
+          }
+          if (!clean) continue;
+          let ext = j; for (let k = j; k <= i; k++) if (lowSide ? X[k].h > X[ext].h : X[k].l < X[ext].l) ext = k;
+          const L = { dir, i1: q.i, v1: q.v, i2: j, v2: v, slope, touches: [q.i, j], state: 'active', last: j, ext, pend: null };
+          act[dir] = act[dir].filter(o => o.i1 !== q.i && o.state !== 'dead');
+          act[dir].push(L);
+          if (act[dir].filter(o => o.state === 'active').length > TL_MAX_LINES) act[dir].splice(act[dir].findIndex(o => o.state === 'active'), 1);
+          break;
+        }
+      }
+      P.push({ i: j, v });
+    }
+
+    // 2. follow every line with this candle
+    for (const dir of ['up', 'down']) for (const L of act[dir]) {
+      if (L.state === 'dead' || i <= L.i2 + TL_PIVOT) continue;
+      const c = X[i], Li = val(L, i), up = dir === 'up';
+      if (L.state === 'active' && i - L.i1 > TL_MAX_SPAN) { L.state = 'dead'; continue; }
+
+      if (!L.pend) {
+        if (L.state === 'active') {
+          // break: a close through the line beyond the touch zone
+          if (up ? c.c < Li - tol : c.c > Li + tol) {
+            const forceful = (up ? c.c < c.o : c.c > c.o) && body(c) / range(c) >= FORCE_BODY && range(c) >= FORCE_RANGE * avgAt(i);
+            if (forceful && L.touches.length >= 3) Object.assign(L, { state: 'broken', bi: i, E: i, breakBody: body(c) });
+            else L.state = 'dead';
+            continue;
+          }
+          if (up ? c.h > X[L.ext].h : c.l < X[L.ext].l) L.ext = i;
+          const touch = up ? c.l <= Li + tol : c.h >= Li - tol;
+          if (!touch || L.ext <= L.last) continue;
+          const away = up ? X[L.ext].h - val(L, L.ext) : val(L, L.ext) - X[L.ext].l;
+          if (away < TL_AWAY * avgAt(i)) continue;   // price never really left the line: still the same touch
+          const corrective = avgBody(L.ext + 1, i) < avgBody(L.last, L.ext);
+          const swept = up ? c.l < Li : c.h > Li;
+          L.touches.push(i);
+          if (swept && corrective) L.pend = { sub: 'bounce', sell: !up, gi: i, level: Li, target: up ? X[L.ext].h : X[L.ext].l, touchNo: L.touches.length };
+          L.last = i; L.ext = i;
+        } else {   // broken: waiting for the retest from the other side
+          if (up ? c.c > Li + tol : c.c < Li - tol) { L.state = 'dead'; continue; }   // false break: back on the old side
+          if (i - L.bi > TL_RETEST_MAX) { L.state = 'dead'; continue; }
+          if (up ? c.l < X[L.E].l : c.h > X[L.E].h) L.E = i;
+          const swept = up ? c.h > Li : c.l < Li;
+          if (!swept || L.E >= i) continue;
+          if (avgBody(L.E + 1, i) >= L.breakBody) continue;   // the retest must be weaker (corrective) than the break
+          L.pend = { sub: 'retest', sell: up, gi: i, level: Li, target: up ? X[L.E].l : X[L.E].h, touchNo: L.touches.length };
+        }
+      }
+
+      // a touch / retest waiting for its model (3-candle window, the same 3 models as everywhere else)
+      const p = L.pend; if (!p) continue;
+      const k = helpers(p.sell, p.level);
+      const model = i === p.gi && k.m1(c) ? 1 : i === p.gi + 1 && k.m2(c, X[p.gi]) ? 2 : i === p.gi + 2 && k.m3(c) ? 3 : null;
+      if (model) {
+        const span = X.slice(p.gi, i + 1);
+        const wick = p.sell ? Math.max(...span.map(x => x.h)) : Math.min(...span.map(x => x.l));
+        const tgtOk = p.sell ? p.target < c.c : p.target > c.c;
+        const partial = (wick + p.target) / 2;   // 50% of the move that came back to the line
+        signals.push({
+          kind: 'tl', sub: p.sub, side: p.sell ? 'sell' : 'buy', dir: p.sell ? 'SELL' : 'BUY', state: 'signal', model,
+          grabT: X[p.gi].t, confT: c.t, entry: c.c, stop: wick, partial, partialPassed: p.sell ? c.c <= partial : c.c >= partial,
+          target: tgtOk ? p.target : null, level: p.level, touches: p.touchNo, lineDir: dir, breakT: L.bi != null ? X[L.bi].t : null,
+          line: { t1: X[L.i1].t, v1: L.v1, slope: L.slope, i1: L.i1 },
+          m1weak: model === 1 && Math.abs(c.c - p.level) / range(c) < 0.15
+        });
+        L.pend = null;
+        if (p.sub === 'retest') L.state = 'dead';   // one retest trade per broken line
+      } else if (i >= p.gi + 2) L.pend = null;
+    }
+    for (const dir of ['up', 'down']) act[dir] = act[dir].filter(L => L.state !== 'dead');
+  }
+  // lines still alive at the last candle (for the chart and the cells)
+  const last = n - 1;
+  for (const dir of ['up', 'down']) for (const L of act[dir]) {
+    lines.push({
+      dir, state: L.state === 'broken' ? 'broken' : L.touches.length >= 3 ? 'valid' : 'forming',
+      t1: X[L.i1].t, v1: L.v1, i1: L.i1, slope: L.slope, touches: L.touches.map(k => ({ t: X[k].t, v: val(L, k) })),
+      now: val(L, last), breakT: L.bi != null ? X[L.bi].t : null, valAt: k => val(L, k)
+    });
+  }
+  return { signals, lines };
 }
 
 function analyze(candles, tfMs) {
@@ -456,8 +584,13 @@ function analyze(candles, tfMs) {
     res.setupB = res.sides.map(sd => detectSetupB(d, sd, idx > 0 ? days[idx - 1] : null)).filter(b => b && b.state !== 'invalid');
     out.push(res);
   });
+  // trend lines run over the whole series (not tied to the Asia day); each signal is filed under its trading day
+  const tl = detectTrendlines(candles), byDay = new Map(out.map(r => [r.day, r]));
+  for (const r of out) r.tl = [];
+  for (const sg of tl.signals) { const r = byDay.get(tradingDay(sg.confT)); if (r) r.tl.push(sg); }
+  out.tlLines = tl.lines;
   applyZoneStops(candles, out);
   return out;   // oldest -> newest
 }
 
-if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, outcome, zoneStop, analyze };
+if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, outcome, zoneStop, detectTrendlines, analyze };
