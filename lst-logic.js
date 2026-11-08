@@ -435,8 +435,9 @@ function applyZoneStops(candles, res) {
       if (sd.state !== 'signal' || sd.wick != null) continue;
       const ci = idx.get(sd.confT);
       if (ci == null) continue;
-      sd.wick = sd.stop;   // the extreme of the wick that took the liquidity (still used for the 50%)
-      Object.assign(sd, zoneStop(candles, ci, sd.dir === 'SELL', sd.wick));
+      sd.wick = sd.stop;   // the extreme of the model candle(s): low for a BUY, high for a SELL (also used for the 50%)
+      // Carlos's rule: the stop is ALWAYS at the candle where we entered (below its low for a BUY, above its high for a SELL)
+      Object.assign(sd, { stop: sd.wick, stopKind: 'candle wick', stopZone: null });
     }
   }
 }
