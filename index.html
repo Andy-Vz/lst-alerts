@@ -506,7 +506,12 @@ function statusFor(s) {
   const today = tradingDay(Date.now());
   const day = s.res.length ? s.res[s.res.length - 1] : null;
   if (!day) return [['wait', '—', 'Not enough data yet']];
-  if (day.day !== today) return [['wait', 'CLOSED', 'Market closed / no session data today']];
+  if (day.day !== today) {
+    // today's session is not in the results yet: weekend (Gold/EUR only) or the new Asia range just started at 7 PM NY
+    if (s.instr.weekend && marketClosed(Date.now())) return [['wait', 'CLOSED', 'Weekend: the real market is closed (Fri 5 PM – Sun 6 PM NY)']];
+    if (sessionOf(Date.now()) === 'asia') return [['wait', 'ASIA', 'New session: building the Asia range (7 PM – 2 AM NY)…']];
+    return [['wait', 'CLOSED', 'Market closed / no session data today']];
+  }
   if (!day.asiaDone) return [['wait', 'ASIA', 'Building Asia range…']].concat(fibIdle(day), tlRows(s));
   return sidesOf(day).map(sd => {
     const lvl = sd.side === 'sell' ? 'Asia high' : 'Asia low';
