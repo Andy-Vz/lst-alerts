@@ -137,7 +137,7 @@
       <div class="legend">
         <span class="asiaLeg"><i style="background:var(--info);opacity:.5;height:10px"></i>Asia session</span>
         <span class="asiaLeg"><i style="background:var(--gold)"></i>Asia high / low (liquidity $$$)</span>
-        <span><i style="background:var(--sell)"></i>Stop (the entry candle's wick)</span>
+        <span><i style="background:var(--sell)"></i>Stop (entry candle's wick + small buffer)</span>
         <span><i style="background:var(--info)"></i>Entry</span>
         <span><i style="background:var(--muted)"></i>50%: partials + break-even</span>
         <span><i style="background:var(--buy)"></i>Target (next liquidity)</span>
@@ -171,7 +171,7 @@
         <b>Model 2</b>: the next candle is an engulfing that covers at least <b>50%</b> of candle #1's body and closes back past the line.
         <b>Model 3</b>: the third candle closes back past the line with a solid body.</li>
       <li><b>Continuation (Type 1)</b>: if no model appears and price stays beyond the level, the page labels it "Type 1" and does not alert. If price returns inside without a model, a new sweep is evaluated again.</li>
-      <li><b>Management</b>: entry at the close of the model candle. Stop <b>always at the entry candle</b>: for a BUY, at the low of the candle(s) of the model; for a SELL, at the high. (The book puts it beyond the next S/R zone, pp. 170–171; this page uses the candle.) The 50% is measured from the origin of the move to that wick. At <b>50%</b> of the move that took the liquidity: take 25–50% partials and move to break-even (never BE without partials). Target: the next liquidity, here the opposite side of the Asia range. At the target close <b>80%</b> and leave <b>20% as the "pawn"</b>: stop at break-even, no take profit, trail the stop as price advances (pp. 179–180). <b>Model 1 closing right at the line</b> (variant 4) is flagged: it may only reach the 50%. A Model 1 whose wick only <b>grazes</b> the line (less than 20% of the candle past it) is not accepted (p.109).</li>
+      <li><b>Management</b>: entry at the close of the model candle. Stop <b>always at the entry candle</b>: for a BUY, just below the low of the candle(s) of the model; for a SELL, just above the high, with a small buffer of 10% of the average candle (as in the mentor's charts) so the spread does not take it. <b>Only signals aiming for at least 2× the risk (R:R 1:2) are alerted</b>; the rest are shown greyed out. (The book puts it beyond the next S/R zone, pp. 170–171; this page uses the candle.) The 50% is measured from the origin of the move to that wick. At <b>50%</b> of the move that took the liquidity: take 25–50% partials and move to break-even (never BE without partials). Target: the next liquidity, here the opposite side of the Asia range. At the target close <b>80%</b> and leave <b>20% as the "pawn"</b>: stop at break-even, no take profit, trail the stop as price advances (pp. 179–180). <b>Model 1 closing right at the line</b> (variant 4) is flagged: it may only reach the 50%. A Model 1 whose wick only <b>grazes</b> the line (less than 20% of the candle past it) is not accepted (p.109).</li>
       <li><b>Result of each signal</b>: after the model closes, the page follows price: <b>❌ STOPPED</b> (stop hit), <b>½ 50% hit · stop at BE</b> (take partials, stop to entry), <b>➖ closed at BE</b> (came back to entry after the 50%), <b>🎯 TARGET HIT</b>. If one candle touches both stop and target, it counts as stopped. Finished signals stop being highlighted. The stop used is the exact wick; your real stop has extra margin, as the book says.</li>
       <li><b>Trend and risk:reward</b> (pp. 103, 169, 172–175): the trend is read from price structure on the daily and H4 (higher highs + higher lows = up, lower highs + lower lows = down, otherwise ranging), with no indicators. Every signal is labeled <b>✅ with trend</b> or <b>⚠️ against trend</b> ("a model with the trend is worth 1,000 against it"). Against the trend, the target becomes the <b>50%</b> (then 61.8%) of the last trend move, as the book says. Every signal shows its <b>risk:reward</b>; below <b>1:2</b> it is flagged, because the book says not to enter.</li>
       <li><b>Fibonacci pullback</b> (LST 2.0 pp. 97, 138–144): once the direction is set (a confirmed model, or Type 1 continuation through the Asia level), the page measures the impulse from its origin to its extreme. In the pullback it waits for at least the <b>50%</b> (best: the <b>Golden zone 61.8–78.6%</b>), for price to take an <b>internal liquidity point</b> (a swing low/high inside the impulse) or the <b>first buyers/sellers</b> of the correction, and for Model 1, 2 or 3 in favour of the trend. Stop at the wick of the entry candle · 50% of the pullback for partials + BE · target: the impulse extreme. If the pullback reaches the origin, the setup is cancelled.</li>
@@ -186,7 +186,7 @@
 </main>
 
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="lst-logic.js?v=14"></script>
+<script src="lst-logic.js?v=15"></script>
 <script>
 const INSTR = [
   { id: 'XAU', name: 'Gold', td: 'XAU/USD', bn: 'PAXGUSDT', dp: 2, cost: () => 0.30, weekend: true },
@@ -314,8 +314,12 @@ const resultOf = (s, sd) => outcome({ dir: sd.dir, entry: sd.entry, stop: sd.sto
 const finished = o => o && (o.state === 'stopped' || o.state === 'target' || o.state === 'be');
 const resTag = o => o ? `<span class="res ${RES[o.state][0]}">${RES[o.state][1]}</span>` : '<span class="ctx">—</span>';
 const noTarget = (s, sd) => tradeCtx(s, sd).target == null;   // backtest: 98% of signals without a target lost -> don't take them
-const sigCls = (s, sd) => finished(resultOf(s, sd)) || noTarget(s, sd) || tight(s, sd) ? 'done ' + sd.dir : sd.dir;   // finished / no-target / too-tight signals are not highlighted
-const stopTxt = (sd, dp) => `Stop <b>${fmtP(sd.stop, dp)}</b> (${sd.dir === 'SELL' ? 'above the high' : 'below the low'} of the entry candle)`;
+// Mentor's charts: every trade aims for at least 2x the risk -> below 1:2 the signal is shown but never alerted
+const MIN_RR = 2;
+const lowRR = (s, sd) => { const rr = tradeCtx(s, sd).rr; return rr != null && rr < MIN_RR; };
+const LOWRRTXT = '<span class="res stop">⛔ R:R below 1:2: no alert</span>';
+const sigCls = (s, sd) => finished(resultOf(s, sd)) || noTarget(s, sd) || tight(s, sd) || lowRR(s, sd) ? 'done ' + sd.dir : sd.dir;   // finished / no-target / too-tight signals are not highlighted
+const stopTxt = (sd, dp) => `Stop <b>${fmtP(sd.stop, dp)}</b> (${sd.dir === 'SELL' ? 'above the high' : 'below the low'} of the entry candle + small buffer)`;
 const NOTGT = '<span class="res stop">⛔ no target: do not take</span>';
 // Backtest (5 years, both halves 2021-23 and 2024-26): trades whose spread + commission is more than 10% of the risk
 // lost -0.12R to -0.36R per trade, so they are flagged and never alerted.
@@ -332,7 +336,7 @@ function marketClosed(t) {
   const h = +p.hour % 24;
   return p.weekday === 'Sat' || (p.weekday === 'Fri' && h >= 17) || (p.weekday === 'Sun' && h < 18);
 }
-const sigCtx = (s, sd) => { const tc = tradeCtx(s, sd); const p = [noTarget(s, sd) ? NOTGT : tight(s, sd) ? TIGHTTXT(s, sd) : resTag(resultOf(s, sd)), trendTxt(tc.trend), rrTxt(tc.rr)].filter(Boolean); return `<br><span class="ctx">${p.join(' · ')}</span>`; };
+const sigCtx = (s, sd) => { const tc = tradeCtx(s, sd); const p = [noTarget(s, sd) ? NOTGT : tight(s, sd) ? TIGHTTXT(s, sd) : lowRR(s, sd) ? LOWRRTXT : resTag(resultOf(s, sd)), trendTxt(tc.trend), rrTxt(tc.rr)].filter(Boolean); return `<br><span class="ctx">${p.join(' · ')}</span>`; };
 function recResult(r) {
   const s = Object.values(series).find(x => x.instr.name === r.inst && x.tf.id === r.tf);
   if (!s || !s.candles.length) return null;
@@ -462,7 +466,8 @@ function checkSignals(key) {
       sigHist.unshift(rec);
       const fresh = Date.now() - (sd.confT + s.tf.ms) <= s.tf.ms;   // alert only if the model candle closed less than one candle ago
       if (tc.target == null) rec.noTarget = true;
-      if (fresh && !rec.noTarget && !rec.tight && (!starOnly || rec.star)) fireAlert(rec);
+      if (tc.rr != null && tc.rr < MIN_RR) rec.lowRR = true;
+      if (fresh && !rec.noTarget && !rec.tight && !rec.lowRR && (!starOnly || rec.star)) fireAlert(rec);
     }
   }
   sigHist.sort((a, b) => b.t - a.t); sigHist = sigHist.slice(0, 80);
@@ -475,7 +480,7 @@ function fireAlert(r) {
   b.className = 'show ' + r.dir;
   document.getElementById('bannerText').textContent = `${r.star ? '⭐ ' : ''}${r.prime ? '🔥 PRIME · ' : ''}${r.dir} · ${r.inst} ${r.tf} · ${r.fib ? `Fib pullback Model ${r.model} (${r.zone} ${Math.round(r.depth * 100)}%, ${r.pointKind})` : r.setb ? `Setup B Model ${r.model} (retest of broken S/R ${fmtP(r.level, r.dp)})` : `Model ${r.model} confirmed`} (candle closed ${fmtNY(r.t)} NY)${r.trend ? ' · ' + trendTxt(r.trend) : ''}`;
   document.getElementById('bannerLv').textContent = `Entry ~${fmtP(r.entry, r.dp)} · Stop ${fmtP(r.stop, r.dp)}${r.dir === 'SELL' ? ' (above the candle high)' : ' (below the candle low)'} · 50% partials + BE ${r.partial == null ? 'already passed' : fmtP(r.partial, r.dp)}` + (r.target ? ` · Target ${fmtP(r.target, r.dp)}${r.ctTarget ? ' (counter-trend: 50% of the last move)' : ''}` : '')
-    + (r.rr != null ? ` · ${rrTxt(r.rr)}${r.rr < 2 ? ' below 1:2: the book says skip' : ''}` : '') + (r.m1weak ? ' · ⚠️ M1 closed right at the line: may only reach the 50%' : '');
+    + (r.rr != null ? ` · ${rrTxt(r.rr)}${r.rr < 2 ? ' below 1:2: not alerted' : ''}` : '') + (r.m1weak ? ' · ⚠️ M1 closed right at the line: may only reach the 50%' : '');
   document.title = `🔔 ${r.dir} ${r.inst} ${r.tf}`;
   beep(r.dir);
 }
@@ -588,7 +593,7 @@ function renderAll() { for (const k in series) renderCell(k); renderDetail(); re
 function renderHistory() {
   const rows = sigHist.filter(r => (fibOn || !r.fib) && (setbOn || !r.setb) && (asiaOn || r.fib || r.setb));
   document.getElementById('hist').innerHTML = rows.length ? rows.map(r =>
-    `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? (r.star || r.star == null && r.inst !== 'Bitcoin' ? '⭐ ' : '') + 'FIB ' : r.setb ? 'B ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}${r.trend === 'with' ? ' ✅' : r.trend === 'against' ? ' ⚠️' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td class="${r.rr != null && r.rr < 2 ? 'rrlow' : ''}">${r.rr != null ? '1:' + r.rr.toFixed(1) : '—'}</td><td>${r.noTarget ? NOTGT : r.tight ? `<span class="res stop">⛔ stop too tight (costs ${r.costPct}% of risk)</span>` : resTag(recResult(r))}</td></tr>`
+    `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? (r.star || r.star == null && r.inst !== 'Bitcoin' ? '⭐ ' : '') + 'FIB ' : r.setb ? 'B ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}${r.trend === 'with' ? ' ✅' : r.trend === 'against' ? ' ⚠️' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td class="${r.rr != null && r.rr < 2 ? 'rrlow' : ''}">${r.rr != null ? '1:' + r.rr.toFixed(1) : '—'}</td><td>${r.noTarget ? NOTGT : r.tight ? `<span class="res stop">⛔ stop too tight (costs ${r.costPct}% of risk)</span>` : r.lowRR ? LOWRRTXT : resTag(recResult(r))}</td></tr>`
   ).join('') : '<tr><td colspan="8" style="color:var(--muted)">No signals yet.</td></tr>';
 }
 
@@ -609,9 +614,9 @@ function renderDetail() {
   if (tr) html += `<div>Higher-timeframe trend: <b>${{ up: 'up ↑', down: 'down ↓', range: 'ranging ↔' }[tr.dir]}</b> (daily ${ARROW[tr.d1]} · H4 ${ARROW[tr.h4]}, from highs/lows structure)</div>`;
   const ctxHtml = (sd) => {
     const tc = tradeCtx(s, sd);
-    let h = ` · Result: ${tc.target == null ? NOTGT + ' (the model closed already past the target; in the backtest 98% of these lost)' : tight(s, sd) ? TIGHTTXT(s, sd) + ' (in the backtest these lost on average: not alerted)' : resTag(resultOf(s, sd))}`;
+    let h = ` · Result: ${tc.target == null ? NOTGT + ' (the model closed already past the target; in the backtest 98% of these lost)' : tight(s, sd) ? TIGHTTXT(s, sd) + ' (in the backtest these lost on average: not alerted)' : lowRR(s, sd) ? LOWRRTXT + ' (the mentor only takes trades aiming for 2x the risk or more)' : resTag(resultOf(s, sd))}`;
     if (tc.trend) h += ` · <b>${trendTxt(tc.trend)}</b>`;
-    if (tc.rr != null) h += ` · <span class="${tc.rr < 2 ? 'rrlow' : ''}">R:R 1:${tc.rr.toFixed(1)}${tc.rr < 2 ? ' (book: skip below 1:2)' : ''}</span>`;
+    if (tc.rr != null) h += ` · <span class="${tc.rr < 2 ? 'rrlow' : ''}">R:R 1:${tc.rr.toFixed(1)}${tc.rr < 2 ? ' (below 1:2: not alerted)' : ''}</span>`;
     if (sd.m1weak) h += ` · <span class="rrlow">⚠️ Model 1 closed right at the line: may only reach the 50%</span>`;
     return h;
   };
