@@ -137,7 +137,7 @@
       <div class="legend">
         <span class="asiaLeg"><i style="background:var(--info);opacity:.5;height:10px"></i>Asia session</span>
         <span class="asiaLeg"><i style="background:var(--gold)"></i>Asia high / low (liquidity $$$)</span>
-        <span><i style="background:var(--sell)"></i>Stop (entry candle's wick + small buffer)</span>
+        <span><i style="background:var(--sell)"></i>Stop (beyond the next S/R zone)</span>
         <span><i style="background:var(--info)"></i>Entry</span>
         <span><i style="background:var(--muted)"></i>50%: partials + break-even</span>
         <span><i style="background:var(--buy)"></i>Target (next liquidity)</span>
@@ -171,10 +171,10 @@
         <b>Model 2</b>: the next candle is an engulfing that covers at least <b>50%</b> of candle #1's body and closes back past the line.
         <b>Model 3</b>: the third candle closes back past the line with a solid body.</li>
       <li><b>Continuation (Type 1)</b>: if no model appears and price stays beyond the level, the page labels it "Type 1" and does not alert. If price returns inside without a model, a new sweep is evaluated again.</li>
-      <li><b>Management</b>: entry at the close of the model candle. Stop <b>always at the entry candle</b>: for a BUY, just below the low of the candle(s) of the model; for a SELL, just above the high, with a small buffer of 10% of the average candle (as in the mentor's charts) so the spread does not take it. <b>Only signals aiming for at least 2× the risk (R:R 1:2) are alerted</b>; the rest are shown greyed out. (The book puts it beyond the next S/R zone, pp. 170–171; this page uses the candle.) The 50% is measured from the origin of the move to that wick. At <b>50%</b> of the move that took the liquidity: take 25–50% partials and move to break-even (never BE without partials). Target: the next liquidity, here the opposite side of the Asia range. At the target close <b>80%</b> and leave <b>20% as the "pawn"</b>: stop at break-even, no take profit, trail the stop as price advances (pp. 179–180). <b>Model 1 closing right at the line</b> (variant 4) is flagged: it may only reach the 50%. A Model 1 whose wick only <b>grazes</b> the line (less than 20% of the candle past it) is not accepted (p.109).</li>
+      <li><b>Management</b>: entry at the close of the model candle. Stop <b>by zones, never at the wick</b> (pp. 170–171): for a SELL, beyond the next resistance (a previous swing high) above the model's wick; for a BUY, beyond the next support below it, plus a small margin. If there is no zone beyond the wick (e.g. a new high), the wick plus a margin is used and flagged. In a 10-year backtest this stop lost the least of all stop rules tested (the wick stop was hit more often). <b>Only signals aiming for at least 2× the risk (R:R 1:2) are alerted</b> (p.173: "if your win rate does not let you hold at least 1:2, simply do not enter"); the rest are shown greyed out. The 50% is still measured from the origin of the move to the wick. At <b>50%</b> of the move that took the liquidity: take 25–50% partials and move to break-even (never BE without partials). Target: the next liquidity, here the opposite side of the Asia range. At the target close <b>80%</b> and leave <b>20% as the "pawn"</b>: stop at break-even, no take profit, trail the stop as price advances (pp. 179–180). <b>Model 1 closing right at the line</b> (variant 4) is flagged: it may only reach the 50%. A Model 1 whose wick only <b>grazes</b> the line (less than 20% of the candle past it) is not accepted (p.109).</li>
       <li><b>Result of each signal</b>: after the model closes, the page follows price: <b>❌ STOPPED</b> (stop hit), <b>½ 50% hit · stop at BE</b> (take partials, stop to entry), <b>➖ closed at BE</b> (came back to entry after the 50%), <b>🎯 TARGET HIT</b>. If one candle touches both stop and target, it counts as stopped. Finished signals stop being highlighted. The stop used is the exact wick; your real stop has extra margin, as the book says.</li>
       <li><b>Trend and risk:reward</b> (pp. 103, 169, 172–175): the trend is read from price structure on the daily and H4 (higher highs + higher lows = up, lower highs + lower lows = down, otherwise ranging), with no indicators. Every signal is labeled <b>✅ with trend</b> or <b>⚠️ against trend</b> ("a model with the trend is worth 1,000 against it"). Against the trend, the target becomes the <b>50%</b> (then 61.8%) of the last trend move, as the book says. Every signal shows its <b>risk:reward</b>; below <b>1:2</b> it is flagged, because the book says not to enter.</li>
-      <li><b>Fibonacci pullback</b> (LST 2.0 pp. 97, 138–144): once the direction is set (a confirmed model, or Type 1 continuation through the Asia level), the page measures the impulse from its origin to its extreme. In the pullback it waits for at least the <b>50%</b> (best: the <b>Golden zone 61.8–78.6%</b>), for price to take an <b>internal liquidity point</b> (a swing low/high inside the impulse) or the <b>first buyers/sellers</b> of the correction, and for Model 1, 2 or 3 in favour of the trend. Stop at the wick of the entry candle · 50% of the pullback for partials + BE · target: the impulse extreme. If the pullback reaches the origin, the setup is cancelled.</li>
+      <li><b>Fibonacci pullback</b> (LST 2.0 pp. 97, 138–144): once the direction is set (a confirmed model, or Type 1 continuation through the Asia level), the page measures the impulse from its origin to its extreme. In the pullback it waits for at least the <b>50%</b> (best: the <b>Golden zone 61.8–78.6%</b>), for price to take an <b>internal liquidity point</b> (a swing low/high inside the impulse) or the <b>first buyers/sellers</b> of the correction, and for Model 1, 2 or 3 in favour of the trend. Stop beyond the next S/R zone past the sweep · 50% of the pullback for partials + BE · target: the impulse extreme. If the pullback reaches the origin, the setup is cancelled.</li>
     </ol>
     <p><b>Setup B, the second chance</b> (LST 2.0 pp. 182–186): after a confirmed model, the page finds the nearest S/R in the trade's direction (swing points before the model and the previous day's high/low). (A) Price must break it <b>with force</b> (a strong candle closing through it). (B) Price comes back to retest that zone with <b>weaker, corrective candles</b>. (C) A model confirms there, at the S/R line, an internal liquidity point or the first buyers/sellers of the retest. The page shows the risk:reward and flags anything below <b>1:2</b>, where the book says to skip the trade.</p>
     <p><b>Backtest, 5 years (Nov 2021 – Nov 2026, Gold/EUR/USD/Bitcoin stand-ins, 15m–4h, stop by zones, half at the 50% + BE, rest at the target, no costs)</b>: about 3 of 4 signals reached the 50% (no loss). <b>⭐ Fibonacci pullbacks</b> were the only setup positive every year (+0.02R to +0.15R per trade, +0.08R average); Asia and Setup B were close to break-even. Signals whose model closed already past the target (<b>⛔ no target</b>) lost 98% of the time, so the page marks them and does not alert them. Past results do not guarantee future results; this is not financial advice.</p>
@@ -186,7 +186,7 @@
 </main>
 
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="lst-logic.js?v=15"></script>
+<script src="lst-logic.js?v=16"></script>
 <script>
 const INSTR = [
   { id: 'XAU', name: 'Gold', td: 'XAU/USD', bn: 'PAXGUSDT', dp: 2, cost: () => 0.30, weekend: true },
@@ -319,7 +319,7 @@ const MIN_RR = 2;
 const lowRR = (s, sd) => { const rr = tradeCtx(s, sd).rr; return rr != null && rr < MIN_RR; };
 const LOWRRTXT = '<span class="res stop">⛔ R:R below 1:2: no alert</span>';
 const sigCls = (s, sd) => finished(resultOf(s, sd)) || noTarget(s, sd) || tight(s, sd) || lowRR(s, sd) ? 'done ' + sd.dir : sd.dir;   // finished / no-target / too-tight signals are not highlighted
-const stopTxt = (sd, dp) => `Stop <b>${fmtP(sd.stop, dp)}</b> (${sd.dir === 'SELL' ? 'above the high' : 'below the low'} of the entry candle + small buffer)`;
+const stopTxt = (sd, dp) => `Stop <b>${fmtP(sd.stop, dp)}</b> ${sd.stopZone != null ? `(beyond the S/R zone ${fmtP(sd.stopZone, dp)}, not the wick ${fmtP(sd.wick, dp)})` : '(no S/R zone found: wick + margin)'}`;
 const NOTGT = '<span class="res stop">⛔ no target: do not take</span>';
 // Backtest (5 years, both halves 2021-23 and 2024-26): trades whose spread + commission is more than 10% of the risk
 // lost -0.12R to -0.36R per trade, so they are flagged and never alerted.
@@ -479,7 +479,7 @@ function fireAlert(r) {
   const b = document.getElementById('banner');
   b.className = 'show ' + r.dir;
   document.getElementById('bannerText').textContent = `${r.star ? '⭐ ' : ''}${r.prime ? '🔥 PRIME · ' : ''}${r.dir} · ${r.inst} ${r.tf} · ${r.fib ? `Fib pullback Model ${r.model} (${r.zone} ${Math.round(r.depth * 100)}%, ${r.pointKind})` : r.setb ? `Setup B Model ${r.model} (retest of broken S/R ${fmtP(r.level, r.dp)})` : `Model ${r.model} confirmed`} (candle closed ${fmtNY(r.t)} NY)${r.trend ? ' · ' + trendTxt(r.trend) : ''}`;
-  document.getElementById('bannerLv').textContent = `Entry ~${fmtP(r.entry, r.dp)} · Stop ${fmtP(r.stop, r.dp)}${r.dir === 'SELL' ? ' (above the candle high)' : ' (below the candle low)'} · 50% partials + BE ${r.partial == null ? 'already passed' : fmtP(r.partial, r.dp)}` + (r.target ? ` · Target ${fmtP(r.target, r.dp)}${r.ctTarget ? ' (counter-trend: 50% of the last move)' : ''}` : '')
+  document.getElementById('bannerLv').textContent = `Entry ~${fmtP(r.entry, r.dp)} · Stop ${fmtP(r.stop, r.dp)}${r.stopZone != null ? ' (beyond S/R zone ' + fmtP(r.stopZone, r.dp) + ')' : ' (no zone: wick + margin)'} · 50% partials + BE ${r.partial == null ? 'already passed' : fmtP(r.partial, r.dp)}` + (r.target ? ` · Target ${fmtP(r.target, r.dp)}${r.ctTarget ? ' (counter-trend: 50% of the last move)' : ''}` : '')
     + (r.rr != null ? ` · ${rrTxt(r.rr)}${r.rr < 2 ? ' below 1:2: not alerted' : ''}` : '') + (r.m1weak ? ' · ⚠️ M1 closed right at the line: may only reach the 50%' : '');
   document.title = `🔔 ${r.dir} ${r.inst} ${r.tf}`;
   beep(r.dir);
@@ -715,7 +715,7 @@ function drawChart(s) {
     const tc = tradeCtx(s, sd), endT = done ? o.t : all[all.length - 1].t + OPEN_EXT * s.tf.ms;
     if (endT <= sd.confT) return;
     const seg = (price, col, title) => { if (price != null && isFinite(price)) segs.push({ price, color: col, title, from: sd.confT, to: endT, live: !done }); };
-    seg(sd.stop, cssVar('--sell'), 'Stop · ' + (sell ? 'candle high' : 'candle low'));
+    seg(sd.stop, cssVar('--sell'), 'Stop · ' + (sd.stopZone != null ? (sell ? 'above' : 'below') + ' S/R zone' : 'wick + margin'));
     seg(sd.entry, cssVar('--info'), 'Entry');
     if (!sd.partialPassed) seg(sd.partial, cssVar('--muted'), '50% · partials + BE');
     if (tc.target != null) seg(tc.target, cssVar('--buy'), 'Target · ' + (tc.ctTarget ? '50% of the last move' : tgtName));

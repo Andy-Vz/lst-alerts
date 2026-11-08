@@ -406,8 +406,8 @@ function outcome(sig, candles) {
 // A small margin is added beyond the zone. If there is no zone (e.g. all-time high), wick + margin, flagged.
 const STOP_LOOKBACK = 300;   // candles back to look for S/R zones
 const STOP_PIVOT = 3;        // swing point = extreme vs 3 candles on each side
-const STOP_MARGIN = 0.25;
-const STOP_BUFFER = 0.10;    // stop beyond the entry candle's wick by 10% of the average candle range    // margin beyond the zone = 25% of the average candle range
+const STOP_MARGIN = 0.25;    // margin beyond the zone = 25% of the average candle range
+const STOP_BUFFER = 0.10;    // wick + 10% of the average candle (kept only for backtests: sd.stopBuf)
 
 function zoneStop(candles, ci, sell, wick) {
   const from = Math.max(0, ci - STOP_LOOKBACK);
@@ -436,12 +436,11 @@ function applyZoneStops(candles, res) {
       if (sd.state !== 'signal' || sd.wick != null) continue;
       const ci = idx.get(sd.confT);
       if (ci == null) continue;
-      sd.wick = sd.stop;   // the extreme of the model candle(s): low for a BUY, high for a SELL (also used for the 50%)
-      // Carlos's rule: the stop is ALWAYS at the candle where we entered (below its low for a BUY, above its high for a SELL),
-      // plus a small buffer like in the mentor's charts (10% of the average candle, e.g. ~$2 on Gold 1h) so the spread does not take it
+      sd.wick = sd.stop;   // the extreme of the wick that took the liquidity (still used for the 50%)
+      // Book stop (pp. 170-171): beyond the next S/R zone. 10-year backtest (Nov 2026): smallest loss of all stop rules tested.
       const recent = candles.slice(Math.max(0, ci - 100), ci + 1);
-      const buf = STOP_BUFFER * recent.reduce((a, c) => a + (c.h - c.l), 0) / Math.max(1, recent.length);
-      Object.assign(sd, { stop: sd.dir === 'SELL' ? sd.wick + buf : sd.wick - buf, stopKind: 'candle wick + buffer', stopZone: null, stopBuf: buf });
+      sd.stopBuf = STOP_BUFFER * recent.reduce((a, c) => a + (c.h - c.l), 0) / Math.max(1, recent.length);
+      Object.assign(sd, zoneStop(candles, ci, sd.dir === 'SELL', sd.wick));
     }
   }
 }
