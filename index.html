@@ -224,16 +224,16 @@ function renderFibBtn() {
   document.getElementById('fibLegend').style.display = fibOn ? '' : 'none';
 }
 let asiaOn = store.get('asia', true);
-const sidesOf = day => asiaOn && day && day.sides ? day.sides : [];
+// BUY / SELL signals are always kept; the Asia button only hides the range itself and the rows still waiting (WAIT / GRAB / NO MODEL)
+const sidesOf = day => !day || !day.sides ? [] : asiaOn ? day.sides : day.sides.filter(sd => sd.state === 'signal');
 function toggleAsia() {
   asiaOn = !asiaOn; store.set('asia', asiaOn); renderAsiaBtn();
-  if (asiaOn) for (const k in series) if (!series[k].loading) checkSignals(k);
   renderAll();
 }
 function renderAsiaBtn() {
   const b = document.getElementById('asiaBtn');
   b.textContent = '🌏 Asia';
-  b.title = 'Show / hide the Asia range setups (Asia high/low grabs + Models 1-3) and their alerts. ' + (asiaOn ? 'Now ON' : 'Now OFF');
+  b.title = 'Show / hide the Asia range on the page (lines, shading, waiting rows). BUY / SELL signals and their alerts always stay. ' + (asiaOn ? 'Now ON' : 'Now OFF');
   b.classList.toggle('on', asiaOn);
   document.querySelectorAll('.asiaLeg').forEach(e => e.style.display = asiaOn ? '' : 'none');
 }
@@ -593,7 +593,7 @@ function renderCell(key) {
 function renderAll() { for (const k in series) renderCell(k); renderDetail(); renderHistory(); renderSrc(); }
 
 function renderHistory() {
-  const rows = sigHist.filter(r => (fibOn || !r.fib) && (setbOn || !r.setb) && (asiaOn || r.fib || r.setb));
+  const rows = sigHist.filter(r => (fibOn || !r.fib) && (setbOn || !r.setb));
   document.getElementById('hist').innerHTML = rows.length ? rows.map(r =>
     `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? (r.star || r.star == null && r.inst !== 'Bitcoin' ? '⭐ ' : '') + 'FIB ' : r.setb ? 'B ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}${r.trend === 'with' ? ' ✅' : r.trend === 'against' ? ' ⚠️' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td class="${r.rr != null && r.rr < 2 ? 'rrlow' : ''}">${r.rr != null ? '1:' + r.rr.toFixed(1) : '—'}</td><td>${r.noTarget ? NOTGT : resFull(recResult(r)) + (r.tight ? `<br><span class="ctx">⛔ stop too tight: costs ${r.costPct}% of risk, no alert</span>` : r.lowRR ? '<br><span class="ctx">⛔ R:R below 1:2, no alert</span>' : '')}</td></tr>`
   ).join('') : '<tr><td colspan="8" style="color:var(--muted)">No signals yet.</td></tr>';
