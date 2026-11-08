@@ -390,15 +390,17 @@ function trendInfo(c4h) {
 // after that, back to entry -> BE; target -> TARGET. If one candle touches stop and target, the stop counts (conservative).
 function outcome(sig, candles) {
   const sell = sig.dir === 'SELL';
-  let half = false, halfT = null;
+  const risk = Math.abs(sig.entry - sig.stop), oneRLvl = sell ? sig.entry - risk : sig.entry + risk;   // price at which the trade is 1:1
+  let half = false, halfT = null, oneR = false;
   for (const c of candles) {
     if (c.t <= sig.confT) continue;
     const stopLvl = half ? sig.entry : sig.stop;
-    if (sell ? c.h >= stopLvl : c.l <= stopLvl) return { state: half ? 'be' : 'stopped', t: c.t, halfT };
-    if (sig.target != null && (sell ? c.l <= sig.target : c.h >= sig.target)) return { state: 'target', t: c.t, halfT };
+    if (sell ? c.h >= stopLvl : c.l <= stopLvl) return { state: half ? 'be' : 'stopped', t: c.t, halfT, oneR };   // same candle: the stop counts, 1:1 does not
+    if (sell ? c.l <= oneRLvl : c.h >= oneRLvl) oneR = true;
+    if (sig.target != null && (sell ? c.l <= sig.target : c.h >= sig.target)) return { state: 'target', t: c.t, halfT, oneR };
     if (!half && sig.partial != null && (sell ? c.l <= sig.partial : c.h >= sig.partial)) { half = true; halfT = c.t; }
   }
-  return { state: half ? 'half' : 'open', halfT };
+  return { state: half ? 'half' : 'open', halfT, oneR };
 }
 
 // ---------- Stop loss by ZONES, never at the wick (LST 2.0 pp. 170-171) ----------
