@@ -756,9 +756,9 @@ function drawChart(s) {
     markers.push({ time: sd.confT / 1000, position: sell ? 'aboveBar' : 'belowBar', color: color || (sell ? cssVar('--sell') : cssVar('--buy')), shape: sell ? 'arrowDown' : 'arrowUp', text: `${label.startsWith('FIB') ? '⭐ ' : ''}${sd.dir} · ${label}${sd.model}${done ? ' ✓' : ''}` });
     const tc = tradeCtx(s, sd), endT = done ? o.t : all[all.length - 1].t + OPEN_EXT * s.tf.ms;
     if (endT <= sd.confT) return;
-    const seg = (price, col, title) => { if (price != null && isFinite(price)) segs.push({ price, color: col, title, from: sd.confT, to: endT, live: !done }); };
+    const seg = (price, col, title, width = 1, style = 2) => { if (price != null && isFinite(price)) segs.push({ price, color: col, title, from: sd.confT, to: endT, live: !done, width, style }); };
     seg(sd.stop, cssVar('--sell'), 'Stop · ' + (sd.stopZone != null ? (sell ? 'above' : 'below') + ' S/R zone' : 'wick + margin'));
-    seg(sd.entry, cssVar('--info'), 'Entry');
+    seg(sd.entry, cssVar('--info'), 'Entry', 3, 0);   // solid and thick: the line to find first
     if (!sd.partialPassed) seg(sd.partial, cssVar('--muted'), '50% · partials + BE');
     if (tc.target != null) seg(tc.target, cssVar('--buy'), 'Target · ' + (tc.ctTarget ? '50% of the last move' : tgtName));
   };
@@ -808,7 +808,7 @@ function drawChart(s) {
   lwSeg.forEach((ser, k) => {
     const g = segs[k];
     if (!g) { ser.setData([]); return; }
-    ser.applyOptions({ color: g.color, lastValueVisible: g.live, title: g.live ? g.title : '', priceFormat: { type: 'price', precision: dp, minMove: Math.pow(10, -dp) } });
+    ser.applyOptions({ color: g.color, lineWidth: g.width, lineStyle: g.style, lastValueVisible: g.live, title: g.live ? g.title : '', priceFormat: { type: 'price', precision: dp, minMove: Math.pow(10, -dp) } });
     ser.setData([{ time: g.from / 1000, value: g.price }, { time: g.to / 1000, value: g.price }]);
   });
   markers.sort((a, c) => a.time - c.time);
