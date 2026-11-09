@@ -26,6 +26,7 @@
   #setbBtn.on { border-color: var(--setb); color: var(--setb); }
   #asiaBtn.on { border-color: var(--info); color: var(--info); }
   #tlBtn.on { border-color: var(--tl); color: var(--tl); }
+  #watchBtn.on { border-color: var(--info); color: var(--info); }
   button.tg:not(.on) { color: var(--muted); text-decoration: line-through; opacity: .75; }
   main { padding: 18px 20px 40px; max-width: 1400px; margin: 0 auto; }
 
@@ -72,6 +73,7 @@
   .tag.setb { background: var(--setb); color: #002623; }
   .tag.tl { background: var(--tl); color: #1a1000; }
   .tag.tlf { background: var(--panel2); color: var(--tl); border: 1px dashed var(--tl); }
+  .tag.watch { background: var(--panel2); color: var(--info); border: 1px solid var(--info); }
   .rrlow { color: var(--warn); font-weight: 600; }
   .trend { margin-top: 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
   .trend span { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
@@ -118,6 +120,7 @@
   <button id="fibBtn" class="tg" onclick="toggleFib()"></button>
   <button id="setbBtn" class="tg" onclick="toggleSetb()"></button>
   <button id="tlBtn" class="tg" onclick="toggleTl()"></button>
+  <button id="watchBtn" class="tg" onclick="toggleWatch()"></button>
   <button onclick="testAlert()" title="Play a test alert">🔔 Test</button>
   <button onclick="refreshAll(true)" title="Refresh all prices now">⟳ Refresh</button>
 </header>
@@ -144,6 +147,7 @@
         <span id="fibLegend"><i style="background:var(--fib);opacity:.5;height:10px"></i>Fibonacci pullback · Golden zone 61.8–78.6%</span>
         <span id="setbLegend"><i style="background:var(--setb)"></i>Setup B: broken S/R to retest</span>
         <span id="tlLegend"><i style="background:var(--tl)"></i>Trend line (3+ touches) · dashed: forming (2) or broken · context only, no alerts</span>
+        <span id="watchLegend"><i style="background:var(--info)"></i>WATCH: pullback to the 50–78.6% of the last strong move · not tied to Asia · no alerts</span>
         <span>🔥 Prime hours: confirmed 3–5 AM (London) or 9–11 AM (New York), NY time</span>
         <span>✅ With the higher-timeframe trend · ⚠️ Against it</span>
         <span>✓ 1:1: price moved at least as far as the risk</span>
@@ -183,6 +187,7 @@
     </ol>
     <p><b>Setup B, the second chance</b> (LST 2.0 pp. 182–186): after a confirmed model, the page finds the nearest S/R in the trade's direction (swing points before the model and the previous day's high/low). (A) Price must break it <b>with force</b> (a strong candle closing through it). (B) Price comes back to retest that zone with <b>weaker, corrective candles</b>. (C) A model confirms there, at the S/R line, an internal liquidity point or the first buyers/sellers of the retest. The page shows the risk:reward and flags anything below <b>1:2</b>, where the book says to skip the trade.</p>
     <p><b>Backtest, 5 years (Nov 2021 – Nov 2026, Gold/EUR/USD/Bitcoin stand-ins, 15m–4h, stop by zones, half at the 50% + BE, rest at the target, no costs)</b>: about 3 of 4 signals reached the 50% (no loss). <b>⭐ Fibonacci pullbacks</b> were the only setup positive every year (+0.02R to +0.15R per trade, +0.08R average); Asia and Setup B were close to break-even. Signals whose model closed already past the target (<b>⛔ no target</b>) lost 98% of the time, so the page marks them and does not alert them. Past results do not guarantee future results; this is not financial advice.</p>
+    <p><b>👁 WATCH</b> (not tied to the Asia range): the page measures the last strong move (at least 5 average candles) and shows <b>WATCH</b> while price is back between the <b>50% and 78.6%</b> of it, adding an S/R zone if earlier swing points sit there. WATCH is not a signal, only "look at this chart". It becomes <b>W SELL / W BUY</b> only when a Model 1, 2 or 3 closes in the pullback. <b>Context only, never alerted, not in the history</b>: this setup has not been backtested, and similar retests lost after costs. Zones drawn by hand can differ from the ones the page finds.</p>
     <p><b>📈 Trend lines</b> (LST 2.0 pp. 61–66, 103, 126): a trend line is a dynamic S/R joining at least two swing points (higher lows for a rising line, lower highs for a falling one) that no candle has closed through. The book says never to enter on the 2nd point: wait for price to move away with speed and come back with a corrective pullback, then look for Model 1, 2 or 3 at the next touch (touch #3 or later). A line with 3+ touches broken by a strong candle is watched for a retest from the other side. A touch counts within 30% of an average candle of the line. <b>Shown as context only, never alerted</b>: in the 5-year backtest the touch models were about break-even (+0.02R per trade before costs, −0.05R after) and the retests lost (−0.01R before costs, −0.09R after).</p>
     <p><b>Real prices (important)</b>: the earlier backtests used the Binance stand-ins. Re-run on <b>5 years of real 1-minute prices</b> (Gold, EUR/USD, USD/JPY, GBP/USD, GBP/JPY; spread + commission per trade: Gold $0.30, EUR/USD 1 pip, USD/JPY 1.2 pips, GBP/USD 1.4 pips, GBP/JPY 2.5 pips), with the page's stops and management: <b>no setup has a reliable edge after costs</b>. Fib: Gold −0.06R, EUR/USD −0.05R, USD/JPY +0.05R, GBP/USD +0.05R, GBP/JPY −0.01R per trade (about 300 trades each, too few to trust the small positives). Asia and Setup B were negative on all five. The page finds the book's models; it does not make them profitable. Past results do not guarantee future results; this is not financial advice.</p>
     <p><b>Filters from the backtest</b> (5 years, checked separately in 2021–23 and 2024–26 so they are not luck): (1) <b>Weekends</b>: Gold and EUR/USD are closed Friday 5 PM – Sunday 6 PM NY, but the Binance stand-ins keep trading, so models in that window are shown as CLOSED and never alerted. (2) <b>⛔ Stop too tight</b>: when the spread + commission is more than 10% of the risk, the trade lost −0.12R to −0.36R on average, so it is flagged and not alerted. (3) <b>⭐ marks Fib pullback signals</b> (not on Bitcoin, where costs are higher). With the stand-ins they looked positive, with real prices they did not (see above). (4) Tested and <b>not</b> added as alerts because they were break-even: London range high/low hunted in New York, yesterday's high/low (PDH/PDL), swing liquidity on S/R zones, trend lines.</p>
@@ -191,7 +196,7 @@
 </main>
 
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="lst-logic.js?v=17"></script>
+<script src="lst-logic.js?v=18"></script>
 <script>
 const INSTR = [
   { id: 'XAU', name: 'Gold', td: 'XAU/USD', bn: 'PAXGUSDT', dp: 2, cost: () => 0.30, weekend: true },
@@ -267,6 +272,28 @@ function renderTlBtn() {
   b.title = 'Show / hide trend lines on the chart and in the cells (context only: they never alert)';
   b.classList.toggle('on', tlOn);
   document.getElementById('tlLegend').style.display = tlOn ? '' : 'none';
+}
+// WATCH: pullback to the 50-78.6% of the last strong move, not tied to Asia. Context only: no alerts, no history
+let watchOn = store.get('watch', true);
+const watchOf = s => watchOn && s.watch && !(s.instr.weekend && marketClosed(Date.now())) ? s.watch : null;
+function toggleWatch() { watchOn = !watchOn; store.set('watch', watchOn); renderWatchBtn(); renderAll(); }
+function renderWatchBtn() {
+  const b = document.getElementById('watchBtn');
+  b.textContent = '👁 Watch';
+  b.title = 'Show / hide WATCH: pullbacks to the 50-78.6% of the last strong move, not tied to the Asia range (context only: they never alert)';
+  b.classList.toggle('on', watchOn);
+  document.getElementById('watchLegend').style.display = watchOn ? '' : 'none';
+}
+const watchMove = (w, dp) => `${w.dir === 'SELL' ? 'fall' : 'rise'} ${fmtP(w.A, dp)} → ${fmtP(w.B, dp)}`;
+const watchSr = (w, dp) => w.srZone != null ? ` · S/R zone near ${fmtP(w.srZone, dp)}` : '';
+function watchRows(s) {
+  const w = watchOf(s), dp = s.instr.dp;
+  if (!w) return [];
+  if (w.state === 'signal') return [[sigCls(s, w), `W ${w.dir} M${w.model}`, `Pullback model at ${fmtNY(w.confT + s.tf.ms).split(', ')[1]} NY in the ${watchMove(w, dp)} · no alert${sigCtx(s, w)}`]];
+  const pct = Math.round(100 * w.nowDepth);
+  return [['watch', 'WATCH', w.state === 'grabbed'
+    ? `${w.dir}: pullback at ${pct}% of the ${watchMove(w, dp)} took liquidity: waiting for a model to close${watchSr(w, dp)}`
+    : `${w.dir}: price back at ${pct}% of the ${watchMove(w, dp)}: wait for a model${watchSr(w, dp)}`]];
 }
 // the lines worth showing: per direction the newest 3+ touch / broken line and the newest forming one
 function shownLines(s) {
@@ -427,6 +454,7 @@ async function load(key) {
       for (const sd of d.sides || []) if (sd.state === 'signal' && marketClosed(sd.confT)) sd.state = 'weekend';
       for (const k of ['fibs', 'setupB', 'tl', 'lq']) if (d[k]) d[k] = d[k].filter(sd => !(sd.state === 'signal' && marketClosed(sd.confT)));
     }
+    s.watch = detectWatch(instr.weekend && !useTD(instr) ? c.filter(x => !marketClosed(x.t)) : c);
     const last = c[c.length - 1];
     let due = last ? last.t + 2 * tf.ms + 20e3 : Date.now() + 60e3;
     if (due <= Date.now()) due = Date.now() + Math.min(tf.ms, 15 * 60e3);   // market closed / stale data
@@ -514,7 +542,8 @@ function beep(dir) {
 }
 
 // ---------- render ----------
-function statusFor(s) {
+function statusFor(s) { return statusBase(s).concat(watchRows(s)); }   // WATCH does not depend on the Asia range or its session
+function statusBase(s) {
   const today = tradingDay(Date.now());
   const day = s.res.length ? s.res[s.res.length - 1] : null;
   if (!day) return [['wait', '—', 'Not enough data yet']];
@@ -656,6 +685,12 @@ function renderDetail() {
     for (const t of tlSigsOf(day)) if (t.state === 'signal')
       html += `<div><span class="tag tl">TL ${t.dir} · Model ${t.model}</span> ${t.sub === 'bounce' ? `Model at touch #${t.touches} of the ${t.lineDir === 'up' ? 'rising' : 'falling'} line` : `Retest of the broken ${t.lineDir === 'up' ? 'rising' : 'falling'} line`} at ${fmtNY(t.confT + s.tf.ms).split(', ')[1]} NY · entry ~${fmtP(t.entry, dp)} · ${stopTxt(t, dp)} <span class="ctx">· context only, not alerted (no edge in the backtest)</span></div>`;
   }
+  const w = watchOf(s);
+  if (w) {
+    html += w.state === 'signal'
+      ? `<div><span class="tag ${w.dir}">WATCH ${w.dir} · Model ${w.model}</span> Pullback in the ${watchMove(w, dp)}. Entry ~<b>${fmtP(w.entry, dp)}</b> · ${stopTxt(w, dp)}${tgtHtml(w, 'end of the move')}${ctxHtml(w)} <span class="ctx">· context only, not alerted</span></div>`
+      : `<div><span class="tag watch">WATCH ${w.dir}</span> ${watchMove(w, dp)} · price at <b>${Math.round(100 * w.nowDepth)}%</b> · 50% <b>${fmtP(w.levels[0.5], dp)}</b> · 78.6% <b>${fmtP(w.levels[0.786], dp)}</b>${watchSr(w, dp)} <span class="ctx">· not a signal: wait for a Model 1, 2 or 3 to close</span></div>`;
+  }
   d.innerHTML = html;
 }
 
@@ -761,6 +796,13 @@ function drawChart(s) {
   for (const r of tlOn ? s.res.slice(-2) : []) for (const t of tlSigsOf(r)) if (t.state === 'signal' && t.confT >= t0c) {
     if (t.sub === 'retest' && t.breakT >= t0c) markers.push({ time: t.breakT / 1000, position: t.lineDir === 'up' ? 'belowBar' : 'aboveBar', color: cssVar('--tl'), shape: 'square', text: 'Break' });
     mark(t, t.sub === 'retest' ? 'Retest M' : 'TL M', t.sub === 'retest' ? (t.dir === 'SELL' ? 'swing low after the break' : 'swing high after the break') : 'top of the last move', cssVar('--tl'));
+  }
+  const wt = watchOf(s);
+  if (wt) {
+    line(wt.levels[0.5], cssVar('--info'), 2, 'Watch 50%');
+    line(wt.levels[0.786], cssVar('--info'), 2, 'Watch 78.6%');
+    if (wt.srZone != null) line(wt.srZone, cssVar('--info'), 0, 'Watch S/R');
+    if (wt.state === 'signal') mark(wt, 'W M', 'end of the move', cssVar('--info'));
   }
   while (lwSeg.length < segs.length) lwSeg.push(lwc.addLineSeries({ lineWidth: 1, lineStyle: 2, priceLineVisible: false, crosshairMarkerVisible: false }));
   lwSeg.forEach((ser, k) => {
@@ -912,7 +954,7 @@ setInterval(() => {   // batch the screen updates (ticks can arrive many times p
 setInterval(() => { for (const k in series) liveDirty.add(k); updateCountdown(); }, 1000);   // keep the countdowns ticking
 setInterval(() => { renderHistory(); for (const k in series) if (!series[k].loading && !series[k].error) renderCell(k); }, 5000);   // results follow price
 
-buildGrid(); buildViewSel(); document.getElementById('starOnly').checked = starOnly; renderAsiaBtn(); renderFibBtn(); renderSetbBtn(); renderTlBtn(); renderAll(); tickClock();
+buildGrid(); buildViewSel(); document.getElementById('starOnly').checked = starOnly; renderAsiaBtn(); renderFibBtn(); renderSetbBtn(); renderTlBtn(); renderWatchBtn(); renderAll(); tickClock();
 connectLive();
 refreshAll(true);
 setInterval(tickClock, 15e3);

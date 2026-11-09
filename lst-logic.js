@@ -674,6 +674,90 @@ function detectLiquidity(X, opt = {}) {
   }
 }
 
+// ---------- WATCH: pullback to the 50-78.6% of the last strong move, NOT tied to the Asia range ----------
+// Context only (no alerts, no history). Price back in the zone = "look at this chart"; it becomes a signal only
+// when a Model 1/2/3 closes there, using the same engine as the Fibonacci pullback.
+const WATCH = {
+  TURN: 3,            // a turn of 3 average candles ends a leg
+  MIN_LEG: 5,         // a strong move is at least 5 average candles long
+  MAX_AGE: 60,        // candles after the end of the move during which the pullback is still watched
+  ZMIN: 0.5, ZMAX: 0.786,
+  ZONE_PIVOT: 5, ZONE_LOOKBACK: 400, ZONE_TOL: 0.5, ZONE_MIN: 2,   // S/R: at least 2 earlier reactions at about the same price
+};
+
+function detectWatch(X, opt = {}) {
+  const P = Object.assign({}, WATCH, opt), n = X.length;
+  if (n < 50) return null;
+  const pre = [0]; for (const c of X) pre.push(pre[pre.length - 1] + (c.h - c.l));
+  const avgAt = i => { const a = Math.max(0, i - 99); return (pre[i + 1] - pre[a]) / (i + 1 - a); };
+
+  // zigzag: turning points separated by at least TURN average candles; the last point is the live extreme
+  const pts = [];
+  let up = null, hiI = 0, loI = 0, e = 0;
+  for (let i = 0; i < n; i++) {
+    const T = P.TURN * avgAt(i);
+    if (up === null) {
+      if (X[i].h > X[hiI].h) hiI = i;
+      if (X[i].l < X[loI].l) loI = i;
+      if (X[hiI].h - X[loI].l >= T) { up = hiI > loI; e = up ? hiI : loI; pts.push(up ? loI : hiI); }
+    } else if (up) {
+      if (X[i].h >= X[e].h) e = i;
+      else if (X[e].h - X[i].l >= T) { pts.push(e); up = false; e = i; }
+    } else {
+      if (X[i].l <= X[e].l) e = i;
+      else if (X[i].h - X[e].l >= T) { pts.push(e); up = true; e = i; }
+    }
+  }
+  if (up === null) return null;
+  pts.push(e);
+  if (pts.length < 2) return null;
+
+  // the move being pulled back: the newest leg, unless it is smaller than the one before (then it IS the pullback)
+  const legOf = k => {
+    const a = pts[k - 1], b = pts[k], sell = X[a].h - X[b].l > X[b].h - X[a].l;
+    return { a, b, sell, size: sell ? X[a].h - X[b].l : X[b].h - X[a].l, strong: (sell ? X[a].h - X[b].l : X[b].h - X[a].l) >= P.MIN_LEG * avgAt(b) };
+  };
+  const L0 = legOf(pts.length - 1), L1 = pts.length > 2 ? legOf(pts.length - 2) : null;
+  const leg = L1 && L1.strong && L0.size < L1.size ? L1 : L0;
+  if (!leg.strong) return null;
+
+  const dir = leg.sell ? 'SELL' : 'BUY';
+  const A = leg.sell ? X[leg.a].h : X[leg.a].l;
+  const f = detectFib({ seq: X.slice(leg.a), post: [] }, { state: 'signal', side: leg.sell ? 'sell' : 'buy', dir, stop: A, grabT: X[leg.a].t, confT: X[leg.b].t });
+  if (!f || (f.state !== 'zone' && f.state !== 'grabbed' && f.state !== 'signal')) return null;
+  const bI = X.findIndex(c => c.t === f.bT);
+  if (n - 1 - bI > P.MAX_AGE) return null;
+  const nowDepth = (f.B - X[n - 1].c) / (f.B - f.A);
+  if (f.state === 'zone' && (nowDepth < P.ZMIN || nowDepth > P.ZMAX)) return null;   // left the zone
+
+  // S/R zone inside the band, from swing points older than the move
+  const z1 = f.B - P.ZMIN * (f.B - f.A), z2 = f.B - P.ZMAX * (f.B - f.A), tol = P.ZONE_TOL * avgAt(n - 1);
+  const zlo = Math.min(z1, z2) - tol, zhi = Math.max(z1, z2) + tol, piv = [];
+  for (let j = Math.max(P.ZONE_PIVOT, leg.a - P.ZONE_LOOKBACK); j < leg.a && j + P.ZONE_PIVOT < n; j++) {
+    let isH = true, isL = true;
+    for (let k = 1; k <= P.ZONE_PIVOT; k++) {
+      if (X[j - k].h > X[j].h || X[j + k].h > X[j].h) isH = false;
+      if (X[j - k].l < X[j].l || X[j + k].l < X[j].l) isL = false;
+    }
+    if (isH) piv.push(X[j].h);
+    if (isL) piv.push(X[j].l);
+  }
+  let srZone = null, srReact = 0;
+  for (const v of piv) {
+    if (v < zlo || v > zhi) continue;
+    const r = piv.filter(x => Math.abs(x - v) <= tol).length;
+    if (r >= P.ZONE_MIN && r > srReact) { srZone = v; srReact = r; }
+  }
+
+  const out = { ...f, kind: 'watch', nowDepth, srZone, srReact };
+  if (f.state === 'signal') {
+    const ci = X.findIndex(c => c.t === f.confT);
+    out.wick = f.stop;
+    Object.assign(out, zoneStop(X, ci, leg.sell, f.stop));
+  }
+  return out;
+}
+
 function analyze(candles, tfMs) {
   const days = groupDays(candles, tfMs).filter(d => d.asiaOk);
   const out = [];
@@ -698,4 +782,4 @@ function analyze(candles, tfMs) {
   return out;   // oldest -> newest
 }
 
-if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, outcome, zoneStop, detectTrendlines, detectLiquidity, LQ, analyze };
+if (typeof module !== 'undefined') module.exports = { ny, tradingDay, sessionOf, isPrime, groupDays, detectSide, detectFib, detectSetupB, structure, toDaily, trendInfo, outcome, zoneStop, detectTrendlines, detectLiquidity, LQ, detectWatch, WATCH, analyze };
