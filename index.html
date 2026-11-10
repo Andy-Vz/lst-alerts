@@ -783,8 +783,10 @@ function drawChart(s) {
   };
   if (day && asiaOn) {
     const tg = v => sidesOf(day).some(sd => sd.state === 'signal' && !finished(resultOf(s, sd)) && tradeCtx(s, sd).target === v);
-    line(day.hi, cssVar('--gold'), 2, 'Asia H $$$' + (tg(day.hi) ? ' · Target' : ''));
-    line(day.lo, cssVar('--gold'), 2, 'Asia L $$$' + (tg(day.lo) ? ' · Target' : ''));
+    // only the latest day: from the start of its Asia session to the newest candle (not across the whole chart)
+    const aFrom = day.asiaCandles && day.asiaCandles.length ? day.asiaCandles[0] : null, aTo = all.length ? all[all.length - 1].t + OPEN_EXT * s.tf.ms : null;
+    if (aFrom != null && aTo > aFrom) for (const [v, nm] of [[day.hi, 'Asia H $$$'], [day.lo, 'Asia L $$$']])
+      if (v != null && isFinite(v)) segs.push({ price: v, color: cssVar('--gold'), title: nm + (tg(v) ? ' · Target' : ''), from: aFrom, to: aTo, live: true, width: 1, style: 2 });
   }
   for (const r of s.res.slice(-2)) for (const sd of sidesOf(r)) if (sd.state === 'signal' && sd.confT >= (all[0] || {}).t) mark(sd, 'M', sd.dir === 'SELL' ? 'Asia low' : 'Asia high');
   // one Fibonacci: today's signal > today's newest setup > yesterday's signal
