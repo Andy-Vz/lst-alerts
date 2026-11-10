@@ -83,10 +83,10 @@
   .err { color: var(--sell); font-size: 12px; }
   .rs { font-weight: 600; } .rs.small { color: var(--buy); } .rs.large { color: var(--warn); } .rs.normal { color: var(--muted); }
 
-  .two { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; margin-top: 18px; }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 18px; }   /* chart on top, full width; history below */
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
   .card h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
-  #chart { width: 100%; height: 440px; position: relative; overflow: hidden; }
+  #chart { width: 100%; height: calc(100vh - 90px); min-height: 460px; position: relative; overflow: hidden; }
   .two > .card { min-width: 0; }
   #chart .cd { position: absolute; right: 0; z-index: 3; color: #fff; font: 600 11px "Segoe UI", system-ui, sans-serif; text-align: center; padding: 1px 0; pointer-events: none; font-variant-numeric: tabular-nums; }
   .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
@@ -96,7 +96,9 @@
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   td, th { text-align: left; padding: 5px 3px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
   th { color: var(--muted); font-weight: 500; }
-  .hist { max-height: 420px; overflow: auto; }
+  .hist { max-height: 520px; overflow: auto; }
+  #hist tr[data-instr] { cursor: pointer; }
+  #hist tr[data-instr]:hover td { background: rgba(127,127,127,.12); }
   .settings { margin-top: 18px; font-size: 13px; color: var(--muted); }
   .settings input { background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 7px 10px; width: 280px; font: inherit; }
   .settings a { color: var(--info); }
@@ -628,9 +630,20 @@ function renderAll() { for (const k in series) renderCell(k); renderDetail(); re
 
 function renderHistory() {
   const rows = sigHist.filter(r => (fibOn || !r.fib) && (setbOn || !r.setb));
-  document.getElementById('hist').innerHTML = rows.length ? rows.map(r =>
-    `<tr><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? (r.star || r.star == null && r.inst !== 'Bitcoin' ? '⭐ ' : '') + 'FIB ' : r.setb ? 'B ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}${r.trend === 'with' ? ' ✅' : r.trend === 'against' ? ' ⚠️' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td class="${r.rr != null && r.rr < MIN_RR ? 'rrlow' : ''}">${r.rr != null ? '1:' + r.rr.toFixed(1) : '—'}</td><td>${r.noTarget ? NOTGT : resFull(recResult(r)) + (r.tight ? `<br><span class="ctx">⛔ stop too tight: costs ${r.costPct}% of risk, no alert</span>` : r.lowRR && r.rr < MIN_RR ? '<br><span class="ctx">⛔ R:R below 1:1, no alert</span>' : '')}</td></tr>`
-  ).join('') : '<tr><td colspan="8" style="color:var(--muted)">No signals yet.</td></tr>';
+  document.getElementById('hist').innerHTML = rows.length ? rows.map(r => {
+    const ins = INSTR.find(i => i.name === r.inst);
+    return `<tr${ins ? ` data-instr="${ins.id}" onclick="openFromHistory('${ins.id}', '${r.tf}')" title="Show ${r.inst} ${r.tf} on the chart"` : ''}><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? (r.star || r.star == null && r.inst !== 'Bitcoin' ? '⭐ ' : '') + 'FIB ' : r.setb ? 'B ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}${r.trend === 'with' ? ' ✅' : r.trend === 'against' ? ' ⚠️' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td class="${r.rr != null && r.rr < MIN_RR ? 'rrlow' : ''}">${r.rr != null ? '1:' + r.rr.toFixed(1) : '—'}</td><td>${r.noTarget ? NOTGT : resFull(recResult(r)) + (r.tight ? `<br><span class="ctx">⛔ stop too tight: costs ${r.costPct}% of risk, no alert</span>` : r.lowRR && r.rr < MIN_RR ? '<br><span class="ctx">⛔ R:R below 1:1, no alert</span>' : '')}</td></tr>`;
+  }).join('') : '<tr><td colspan="8" style="color:var(--muted)">No signals yet.</td></tr>';
+}
+
+// click a history row: show only that market (like the Market drop-down) and open its chart on the row's timeframe
+function openFromHistory(instrId, tf) {
+  const key = instrId + '|' + tf;
+  if (!series[key]) return;
+  setView(instrId);
+  document.getElementById('viewSel').value = instrId;
+  if (selected !== key) select(key);
+  document.getElementById('chartTitle').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function select(key) {
