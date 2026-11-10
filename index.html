@@ -152,6 +152,7 @@
         <span id="watchLegend"><i style="background:var(--info)"></i>WATCH: pullback to the 50–78.6% of the last strong move · not tied to Asia · no alerts</span>
         <span>🔥 Prime hours: confirmed 3–5 AM (London) or 9–11 AM (New York), NY time</span>
         <span>✅ With the higher-timeframe trend · ⚠️ Against it</span>
+        <span><i style="background:linear-gradient(90deg,var(--sell) 50%,var(--buy) 50%);height:3px"></i>$$$ line: the liquidity the model took, from where it was made to the candle that swept it (red = SELL, green = BUY)</span>
         <span>✓ 1:1: price moved at least as far as the risk</span>
         <span>✓ after a chart label: trade finished</span>
       </div>
@@ -198,7 +199,7 @@
 </main>
 
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="lst-logic.js?v=18"></script>
+<script src="lst-logic.js?v=19"></script>
 <script>
 const INSTR = [
   { id: 'XAU', name: 'Gold', td: 'XAU/USD', bn: 'PAXGUSDT', dp: 2, cost: () => 0.30, weekend: true },
@@ -768,6 +769,11 @@ function drawChart(s) {
     const sell = sd.dir === 'SELL', o = resultOf(s, sd), done = finished(o);
     markers.push({ time: sd.confT / 1000, position: sell ? 'aboveBar' : 'belowBar', color: color || (sell ? cssVar('--sell') : cssVar('--buy')), shape: sell ? 'arrowDown' : 'arrowUp', text: `${label.startsWith('FIB') ? '⭐ ' : ''}${sd.dir} · ${label}${sd.model}${done ? ' ✓' : ''}` });
     const tc = tradeCtx(s, sd), endT = done ? o.t : all[all.length - 1].t + OPEN_EXT * s.tf.ms;
+    // liquidity line: from where the swept $$$ was made (left) to the candle that took it -> "where the model comes from"
+    if (sd.srcV != null && sd.srcT != null && sd.grabT > sd.srcT && sd.srcT >= all[0].t) {
+      segs.push({ price: sd.srcV, color: sell ? cssVar('--sell') : cssVar('--buy'), title: '', from: sd.srcT, to: sd.grabT, live: false, width: 2, style: 0 });
+      markers.push({ time: sd.srcT / 1000, position: sell ? 'aboveBar' : 'belowBar', color: sell ? cssVar('--sell') : cssVar('--buy'), shape: 'circle', text: '$$$' });
+    }
     if (endT <= sd.confT) return;
     const seg = (price, col, title, width = 1, style = 2) => { if (price != null && isFinite(price)) segs.push({ price, color: col, title, from: sd.confT, to: endT, live: !done, width, style }); };
     seg(sd.stop, cssVar('--sell'), 'Stop · ' + (sd.stopZone != null ? (sell ? 'above' : 'below') + ' S/R zone' : 'wick + margin'));

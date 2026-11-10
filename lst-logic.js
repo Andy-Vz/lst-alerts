@@ -138,6 +138,7 @@ function detectSide(day, side) {
     return {
       ...base, state: 'signal', model, confT: conf.t, entry: conf.c,
       stop, origin, partial, target: targetOk ? target : null, dir: sell ? 'SELL' : 'BUY',
+      srcV: L, srcT: (day.asia.find(c => (sell ? c.h : c.l) === L) || g).t,   // where the swept liquidity was made (chart line to the left)
       partialPassed: sell ? conf.c <= partial : conf.c >= partial,  // model closed already at/after the 50% (LST 2.0 p.176)
       // Model 1 variant 4 (p.108): body closes right at the line, big wick -> may only reach the 50%
       m1weak: model === 1 && Math.abs(conf.c - L) / Math.max(conf.h - conf.l, 1e-12) < 0.15
@@ -228,7 +229,7 @@ function detectFib(day, sd) {
     return {
       ...out, B, bT: X[bIdx].t, levels: levels(), state: 'signal', model, grabT: c.t, confT: conf.t, entry: conf.c,
       stop, partial, partialPassed: buy ? conf.c >= partial : conf.c <= partial,
-      target: beyond(B, conf.c) ? B : null, point: P.v, pointKind: P.internal ? 'internal liquidity' : 'first ' + (buy ? 'sellers' : 'buyers') + ' of the pullback',
+      target: beyond(B, conf.c) ? B : null, point: P.v, srcV: P.v, srcT: P.t, pointKind: P.internal ? 'internal liquidity' : 'first ' + (buy ? 'sellers' : 'buyers') + ' of the pullback',
       depth: depthOf(stop), zone: fibZone(depthOf(stop))
     };
   }
@@ -301,14 +302,14 @@ function detectSetupB(day, sd, prevDay) {
     const corrective = leg.length > 0 && leg.reduce((s, x) => s + body(x), 0) / leg.length < breakBody;
     if (!corrective) continue;
     // liquidity points: the S/R line itself + swing points (retest side) since the model that this candle sweeps
-    const pts = [{ v: level, what: 'S/R zone' }];
+    const pts = [{ v: level, t: X[bi].t, what: 'S/R zone' }];
     for (let j = ci + PIVOT; j + PIVOT <= i - 1; j++) {
       const v = pull(X[j]); let piv = true;
       for (let k = 1; k <= PIVOT && piv; k++) if (!beyond(pull(X[j - k]), v) || !beyond(pull(X[j + k]), v)) piv = false;
       if (!piv) continue;
       let taken = false;
       for (let k = j + 1; k < i && !taken; k++) if (beyond(v, pull(X[k]))) taken = true;
-      if (!taken) pts.push({ v, what: j < eIdx ? 'internal liquidity' : 'first ' + (sell ? 'buyers' : 'sellers') + ' of the retest' });
+      if (!taken) pts.push({ v, t: X[j].t, what: j < eIdx ? 'internal liquidity' : 'first ' + (sell ? 'buyers' : 'sellers') + ' of the retest' });
     }
     const swept = pts.filter(p => beyond(p.v, pull(c)));
     if (!swept.length) continue;
@@ -329,7 +330,7 @@ function detectSetupB(day, sd, prevDay) {
     const rr = target != null ? Math.abs(target - conf.c) / Math.max(Math.abs(conf.c - stop), 1e-12) : null;   // book p.169: skip below 1:2
     return {
       ...base, state: 'signal', level, breakT: X[bi].t, model, grabT: c.t, confT: conf.t, entry: conf.c, stop,
-      partial, partialPassed: sell ? conf.c <= partial : conf.c >= partial, target, rr, pointKind: P.what
+      partial, partialPassed: sell ? conf.c <= partial : conf.c >= partial, target, rr, pointKind: P.what, srcV: P.v, srcT: P.t
     };
   }
   const last = X[X.length - 1];
