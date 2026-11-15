@@ -440,10 +440,11 @@ function applyZoneStops(candles, res) {
       const ci = idx.get(sd.confT);
       if (ci == null) continue;
       sd.wick = sd.stop;   // the extreme of the wick that took the liquidity (still used for the 50%)
-      // Book stop (pp. 170-171): beyond the next S/R zone. 10-year backtest (Nov 2026): smallest loss of all stop rules tested.
       const recent = candles.slice(Math.max(0, ci - 100), ci + 1);
       sd.stopBuf = STOP_BUFFER * recent.reduce((a, c) => a + (c.h - c.l), 0) / Math.max(1, recent.length);
-      Object.assign(sd, zoneStop(candles, ci, sd.dir === 'SELL', sd.wick));
+      // Carlos's rule (Nov 14 2026): the stop is ALWAYS at the end of the entry candle's wick
+      // (above its high for a SELL, below its low for a BUY). The book's zone stop (pp. 170-171) is zoneStop(), kept for backtests.
+      Object.assign(sd, { stop: sd.wick, stopKind: 'candle wick', stopZone: null });
     }
   }
 }
@@ -754,7 +755,7 @@ function detectWatch(X, opt = {}) {
   if (f.state === 'signal') {
     const ci = X.findIndex(c => c.t === f.confT);
     out.wick = f.stop;
-    Object.assign(out, zoneStop(X, ci, leg.sell, f.stop));
+    Object.assign(out, { stop: f.stop, stopKind: 'candle wick', stopZone: null });   // stop at the entry candle's wick
   }
   return out;
 }
