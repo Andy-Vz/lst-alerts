@@ -780,6 +780,16 @@ function analyze(candles, tfMs) {
   for (const r of out) r.tl = [];
   for (const sg of tl.signals) { const r = byDay.get(tradingDay(sg.confT)); if (r) r.tl.push(sg); }
   out.tlLines = tl.lines;
+  // SELL at any hour (Carlos, Nov 15 2026): an untaken swing high ($$$) on an S/R zone swept + Model 1/2/3,
+  // not tied to the Asia range. Stop at the end of the entry candle's wick (his rule); skipped if an Asia SELL closed on the same candle.
+  for (const r of out) r.lq = [];
+  for (const sg of detectLiquidity(candles)) {
+    if (sg.dir !== 'SELL') continue;
+    const r = byDay.get(tradingDay(sg.confT));
+    if (!r || r.sides.some(sd => sd.state === 'signal' && sd.dir === 'SELL' && sd.confT === sg.confT)) continue;
+    Object.assign(sg, { stop: sg.wick, stopKind: 'candle wick', stopZone: null, srcV: sg.level, srcT: sg.swingT });
+    r.lq.push(sg);
+  }
   applyZoneStops(candles, out);
   return out;   // oldest -> newest
 }
