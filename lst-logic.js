@@ -410,6 +410,7 @@ function outcome(sig, candles) {
 const STOP_LOOKBACK = 300;   // candles back to look for S/R zones
 const STOP_PIVOT = 3;        // swing point = extreme vs 3 candles on each side
 const STOP_MARGIN = 0.25;    // margin beyond the zone = 25% of the average candle range
+const WICK_MARGIN = 0.20;   // Carlos (Nov 16 2026): stop = end of the entry candle's wick + 20% of the average candle (2y backtest: 53% win vs 49% at the bare wick)
 const STOP_BUFFER = 0.10;    // wick + 10% of the average candle (kept only for backtests: sd.stopBuf)
 
 function zoneStop(candles, ci, sell, wick) {
@@ -435,16 +436,18 @@ function zoneStop(candles, ci, sell, wick) {
 function applyZoneStops(candles, res) {
   const idx = new Map(candles.map((c, i) => [c.t, i]));
   for (const d of res) {
-    for (const sd of [].concat(d.sides || [], d.fibs || [], d.setupB || [], d.tl || [])) {
-      if (sd.state !== 'signal' || sd.wick != null) continue;
+    for (const sd of [].concat(d.sides || [], d.fibs || [], d.setupB || [], d.tl || [], d.lq || [])) {
+      if (sd.state !== 'signal' || sd.stopKind === 'wick + 20%') continue;
       const ci = idx.get(sd.confT);
       if (ci == null) continue;
-      sd.wick = sd.stop;   // the extreme of the wick that took the liquidity (still used for the 50%)
-      const recent = candles.slice(Math.max(0, ci - 100), ci + 1);
-      sd.stopBuf = STOP_BUFFER * recent.reduce((a, c) => a + (c.h - c.l), 0) / Math.max(1, recent.length);
-      // Carlos's rule (Nov 14 2026): the stop is ALWAYS at the end of the entry candle's wick
+      if (sd.wick == null) sd.wick = sd.stop;   // the extreme of the wick that took the liquidity (still used for the 50%)
+      const recent = candles.slice(Math.max(0, ci - 99), ci + 1);
+      const avg = recent.reduce((a, c) => a + (c.h - c.l), 0) / Math.max(1, recent.length);
+      sd.stopBuf = STOP_BUFFER * avg;
+      // Carlos's rule (Nov 16 2026): stop beyond the end of the entry candle's wick by 20% of the average candle
       // (above its high for a SELL, below its low for a BUY). The book's zone stop (pp. 170-171) is zoneStop(), kept for backtests.
-      Object.assign(sd, { stop: sd.wick, stopKind: 'candle wick', stopZone: null });
+      const m = WICK_MARGIN * avg;
+      Object.assign(sd, { stop: sd.dir === 'SELL' ? sd.wick + m : sd.wick - m, stopKind: 'wick + 20%', stopZone: null });
     }
   }
 }
@@ -755,7 +758,8 @@ function detectWatch(X, opt = {}) {
   if (f.state === 'signal') {
     const ci = X.findIndex(c => c.t === f.confT);
     out.wick = f.stop;
-    Object.assign(out, { stop: f.stop, stopKind: 'candle wick', stopZone: null });   // stop at the entry candle's wick
+    const rec = X.slice(Math.max(0, ci - 99), ci + 1), m = WICK_MARGIN * rec.reduce((a, c) => a + (c.h - c.l), 0) / Math.max(1, rec.length);
+    Object.assign(out, { stop: leg.sell ? f.stop + m : f.stop - m, stopKind: 'wick + 20%', stopZone: null });   // wick + 20% of the average candle
   }
   return out;
 }
