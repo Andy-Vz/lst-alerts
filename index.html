@@ -662,11 +662,13 @@ function renderCell(key) {
 function renderAll() { for (const k in series) renderCell(k); renderDetail(); renderHistory(); renderSrc(); }
 
 function renderHistory() {
-  const rows = sigHist.filter(r => (fibOn || !r.fib) && (setbOn || !r.setb));
+  // Market drop-down: only that pair's signals in the history (Carlos, Nov 16 2026)
+  const vName = view !== 'all' ? (INSTR.find(i => i.id === view) || {}).name : null;
+  const rows = sigHist.filter(r => (fibOn || !r.fib) && (setbOn || !r.setb) && (!vName || r.inst === vName));
   document.getElementById('hist').innerHTML = rows.length ? rows.map(r => {
     const ins = INSTR.find(i => i.name === r.inst);
     return `<tr${ins ? ` data-instr="${ins.id}" onclick="openFromHistory('${ins.id}', '${r.tf}', ${r.t}, '${r.dir}', '${r.fib ? 'fib' : r.setb ? 'setupB' : r.lq ? 'lq' : 'asia'}')" title="Show ${r.inst} ${r.tf} on the chart"` : ''}><td>${fmtNY(r.t)}</td><td>${r.inst}</td><td>${r.tf}</td><td><span class="tag ${r.dir}">${r.fib ? (r.star || r.star == null && r.inst !== 'Bitcoin' ? '⭐ ' : '') + 'FIB ' : r.setb ? 'B ' : r.lq ? '$$$ ' : ''}${r.dir} M${r.model}</span>${r.prime ? ' 🔥' : ''}${r.trend === 'with' ? ' ✅' : r.trend === 'against' ? ' ⚠️' : ''}</td><td>${fmtP(r.entry, r.dp)}</td><td>${fmtP(r.stop, r.dp)}</td><td class="${r.rr != null && r.rr < MIN_RR ? 'rrlow' : ''}">${r.rr != null ? '1:' + r.rr.toFixed(1) : '—'}</td><td>${r.noTarget ? NOTGT : resFull(recResult(r)) + (r.tight ? `<br><span class="ctx">⛔ stop too tight: costs ${r.costPct}% of risk, no alert</span>` : r.lowRR && r.rr < MIN_RR ? '<br><span class="ctx">⛔ R:R below 1:1, no alert</span>' : '')}</td></tr>`;
-  }).join('') : '<tr><td colspan="8" style="color:var(--muted)">No signals yet.</td></tr>';
+  }).join('') : `<tr><td colspan="8" style="color:var(--muted)">No signals yet${vName ? ' for ' + vName : ''}.</td></tr>`;
 }
 
 // click a history row: show only that market (like the Market drop-down) and open its chart on the row's timeframe
@@ -967,6 +969,7 @@ function applyView() {
   document.querySelectorAll('#grid [data-instr]').forEach(e => e.style.display = view === 'all' || e.dataset.instr === view ? '' : 'none');
   const others = INSTR.filter(i => i.id !== view).map(i => i.name);
   document.getElementById('viewNote').textContent = view === 'all' ? '' : `Alerts still run for ${others.join(' and ')} in the background.`;
+  renderHistory();
 }
 
 // ---------- live price action: Binance WebSocket (bid/ask + the forming candle of every timeframe) ----------
