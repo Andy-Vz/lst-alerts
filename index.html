@@ -43,7 +43,19 @@
   .viewnote { color: var(--muted); font-size: 12px; }
   /* futuristic market picker (Carlos, Nov 16 2026): neon chips instead of the plain drop-down */
   .viewbar { flex-wrap: wrap; }
-  .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px; border-radius: 11px; position: relative;
+  /* one neon button with the chosen pair; click it to open the list (Carlos: the full row was too crowded) */
+  .picker { position: relative; }
+  .pickbtn { padding-right: 8px !important; }
+  .pickbtn .caret { margin-left: 4px; color: var(--c); font-size: 10px; transition: transform .2s; }
+  .picker.open .pickbtn .caret { transform: rotate(180deg); }
+  .picker:not(.open) .chips { display: none; }
+  .chips { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 100%; flex-direction: column; animation: drop .16s ease-out;
+    background: linear-gradient(135deg, rgba(13,22,32,.97), rgba(20,16,32,.97)); backdrop-filter: blur(6px);
+    box-shadow: 0 12px 30px -10px rgba(0,212,255,.35), inset 0 0 24px rgba(0,212,255,.05) !important; }
+  .chips .chip { justify-content: flex-start; }
+  .chips .chip .nm { flex: 1; justify-content: space-between; gap: 14px; }
+  @keyframes drop { from { opacity: 0; transform: translateY(-4px); } }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px; border-radius: 11px;
     background: linear-gradient(135deg, rgba(0,212,255,.06), rgba(185,140,255,.06)); border: 1px solid rgba(0,212,255,.18);
     box-shadow: inset 0 0 24px rgba(0,212,255,.05); }
   .chip { --c: var(--entry); position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 9px 3px 3px;
@@ -69,6 +81,42 @@
   .staronly input { accent-color: var(--gold); width: 15px; height: 15px; cursor: pointer; }
   .grid { display: grid; grid-template-columns: 140px repeat(5, 1fr); gap: 8px; overflow-x: auto; }
   .gh { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; padding: 4px 6px; }
+  /* timeframe tabs (Carlos, Nov 16 2026): choose one timeframe so the board takes less space */
+  .tfbar { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+  .tfbar > label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
+  .tftabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; border: 1px solid rgba(0,212,255,.22);
+    background: linear-gradient(135deg, rgba(0,212,255,.06), rgba(185,140,255,.06)); }
+  .tftab { background: transparent; border: 0; border-radius: 7px; padding: 4px 11px; color: var(--muted);
+    font: 600 12px Consolas, "Cascadia Mono", monospace; letter-spacing: .5px; position: relative; }
+  .tftab:hover { color: var(--text); border: 0; }
+  .tftab.on { color: #061018; background: var(--entry); box-shadow: 0 0 12px -2px var(--entry); }
+  .tftab .dot { position: absolute; top: 3px; right: 3px; width: 5px; height: 5px; border-radius: 50%; }
+  .tftab .dot.SELL { background: var(--sell); box-shadow: 0 0 6px var(--sell); } .tftab .dot.BUY { background: var(--buy); box-shadow: 0 0 6px var(--buy); }
+  .grid.one { grid-template-columns: 170px minmax(0, 620px); }
+  /* one timeframe chosen: the board goes to a column on the RIGHT of the chart (Carlos, Nov 16 2026) */
+  .stage.side { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; align-items: start; }
+  main:has(.stage.side) { max-width: 1900px; }   /* use the full screen width so the chart gets the room */
+  .stage.side .two { order: 1; margin-top: 0; }
+  .stage.side .grid { order: 2; grid-template-columns: 1fr; gap: 6px; position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow-y: auto; padding-right: 2px; }
+  .stage.side .grid > div:first-child, .stage.side .gh { display: none !important; }
+  .stage.side .inst { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 6px 10px; margin-top: 4px; }
+  .stage.side .inst .ba { margin: 0; display: flex; gap: 8px; } .stage.side .inst .ba br { display: none; }
+  .stage.side .inst .trend { margin: 0; } .stage.side .inst .trend span { display: inline; margin-left: 4px; }
+  .stage.side .cell { min-width: 0; min-height: 0; }
+  @media (max-width: 1000px) { .stage.side { grid-template-columns: 1fr; } .stage.side .grid { order: 0; position: static; max-height: none; } }
+  .grid.one .cell { min-height: 0; }
+  /* futuristic look for the board */
+  .cell, .inst { background: linear-gradient(160deg, rgba(28,35,45,.95), rgba(13,17,23,.95)); border-color: #232c38; position: relative; overflow: hidden; }
+  .cell::before, .inst::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,.45), transparent); }
+  .cell:hover { border-color: rgba(0,212,255,.45); box-shadow: 0 0 18px -8px rgba(0,212,255,.6); }
+  .cell.sel { border-color: var(--entry); box-shadow: 0 0 0 1px var(--entry) inset, 0 0 22px -8px var(--entry); }
+  .cell.hot-SELL { background: linear-gradient(160deg, rgba(239,83,80,.16), rgba(13,17,23,.95)); box-shadow: 0 0 20px -10px var(--sell); }
+  .cell.hot-BUY { background: linear-gradient(160deg, rgba(47,191,113,.16), rgba(13,17,23,.95)); box-shadow: 0 0 20px -10px var(--buy); }
+  .cell.hot-SELL::before { background: linear-gradient(90deg, transparent, var(--sell), transparent); }
+  .cell.hot-BUY::before { background: linear-gradient(90deg, transparent, var(--buy), transparent); }
+  .price, .inst .ba b { font-family: Consolas, "Cascadia Mono", monospace; letter-spacing: .3px; }
+  .tag { letter-spacing: .4px; }
   .inst { display: flex; flex-direction: column; justify-content: center; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
   .inst b { font-size: 16px; } .inst small { color: var(--muted); font-size: 11px; }
   .cell { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; min-height: 118px; min-width: 175px; transition: border-color .15s; }
@@ -154,10 +202,13 @@
   <div class="viewbar">
     <label for="viewSel">Market</label>
     <select id="viewSel" onchange="setView(this.value)" hidden></select>
-    <div class="chips" id="viewChips" role="tablist" aria-label="Market"></div>
+    <div class="picker" id="picker"><button class="chip on pickbtn" id="pickBtn" onclick="togglePicker(event)" aria-haspopup="listbox"></button>
+    <div class="chips" id="viewChips" role="listbox" aria-label="Market"></div></div>
     <span class="viewnote" id="viewNote"></span>
     <label class="staronly" title="Only alert Fibonacci pullback signals. Note: on 5 years of real prices no setup had a reliable edge after costs"><input type="checkbox" id="starOnly" onchange="setStarOnly(this.checked)"> 🔔 Alert me only for ⭐ Fib signals</label>
   </div>
+  <div class="tfbar"><label>Timeframe</label><div class="tftabs" id="tfTabs"></div><span class="viewnote">a dot = a live BUY/SELL on that timeframe</span></div>
+  <div class="stage" id="stage">
   <div class="grid" id="grid"></div>
 
   <div class="two">
@@ -187,6 +238,7 @@
       <h2>Signal history</h2>
       <div class="hist"><table><thead><tr><th>NY time</th><th>Market</th><th>TF</th><th>Signal</th><th>Entry</th><th>Stop</th><th>R:R</th><th>Result</th></tr></thead><tbody id="hist"></tbody></table></div>
     </div>
+  </div>
   </div>
 
   <div class="card settings">
@@ -654,12 +706,12 @@ const tlRows = s => shownLines(s).filter(l => l.state !== 'forming').map(l => [l
 
 function buildGrid() {
   const g = document.getElementById('grid');
-  g.innerHTML = '<div></div>' + TFS.map(t => `<div class="gh">${t.id}</div>`).join('');
+  g.innerHTML = '<div></div>' + TFS.map(t => `<div class="gh" data-tf="${t.id}">${t.id}</div>`).join('');
   for (const i of INSTR) {
     g.insertAdjacentHTML('beforeend', `<div class="inst" data-instr="${i.id}"><b>${i.name}</b><small id="src-${i.id}"></small><div class="ba" id="ba-${i.id}"></div><div class="trend" id="tr-${i.id}"></div></div>`);
     for (const t of TFS) {
       const key = i.id + '|' + t.id;
-      g.insertAdjacentHTML('beforeend', `<div class="cell" data-instr="${i.id}" id="c-${key}" onclick="select('${key}')"></div>`);
+      g.insertAdjacentHTML('beforeend', `<div class="cell" data-instr="${i.id}" data-tf="${t.id}" id="c-${key}" onclick="select('${key}')"></div>`);
     }
   }
 }
@@ -673,6 +725,7 @@ function renderCell(key) {
   const sts = statusFor(s);
   const hot = sts.find(x => x[0] === 'SELL' || x[0] === 'BUY');
   if (hot) el.classList.add('hot-' + hot[0]);
+  tfDots();
   el.innerHTML = `
     <div class="row1"><span class="price" id="px-${key}">${fmtP(last && last.c, dp)}</span><span class="age">last close ${last ? fmtNY(last.t + s.tf.ms).split(', ')[1] : ''}</span></div>
     <div class="live" id="lv-${key}"></div>
@@ -704,6 +757,7 @@ function openFromHistory(instrId, tf, t, dir, kind) {
   if (!series[key]) return;
   setView(instrId);
   document.getElementById('viewSel').value = instrId;
+  if (tfView !== 'all' && tfView !== tf) { tfView = tf; store.set('tfview', tf); applyView(); }
   if (selected !== key) select(key);
   focus = t ? { key, t, dir, kind, zoom: true } : null;
   renderDetail();
@@ -804,7 +858,7 @@ function initChart() {
     layout: { background: { type: 'solid', color: cssVar('--panel') }, textColor: cssVar('--muted'), fontFamily: '"Segoe UI", system-ui, sans-serif', fontSize: 11 },
     grid: { vertLines: { color: 'rgba(139,152,168,.08)' }, horzLines: { color: 'rgba(139,152,168,.12)' } },
     rightPriceScale: { borderColor: cssVar('--line'), scaleMargins: { top: 0.08, bottom: 0.08 } },
-    timeScale: { borderColor: cssVar('--line'), timeVisible: true, secondsVisible: false, rightOffset: 8, barSpacing: 8, tickMarkFormatter: tickNY },
+    timeScale: { borderColor: cssVar('--line'), timeVisible: true, secondsVisible: false, rightOffset: 24, barSpacing: 8, tickMarkFormatter: tickNY },
     localization: { timeFormatter: t => fmtNY(t * 1000) + ' NY', priceFormatter: p => fmtP(p, series[selected].instr.dp) },
     crosshair: { mode: 0, vertLine: { color: 'rgba(230,237,243,.35)', labelBackgroundColor: cssVar('--panel2') }, horzLine: { color: 'rgba(230,237,243,.35)', labelBackgroundColor: cssVar('--panel2') } },
   });
@@ -830,7 +884,7 @@ function drawChart(s) {
   if (lwKey !== key) {   // new market/timeframe: show the last ~120 candles; afterwards keep the user's zoom
     lwKey = key;
     lwc.priceScale('right').applyOptions({ autoScale: true });   // a manual vertical zoom on one market would hide the next market's candles
-    if (all.length) lwc.timeScale().setVisibleLogicalRange({ from: Math.max(0, all.length - 120), to: all.length + 6 });
+    if (all.length) lwc.timeScale().setVisibleLogicalRange({ from: Math.max(0, all.length - 120), to: all.length + 26 });   // empty room on the right for the line labels (Asia H, Entry, Watch…) so they don't cover the candles
   }
   for (const l of lwLines) lwSeries.removePriceLine(l);
   lwLines = [];
@@ -916,7 +970,7 @@ function drawChart(s) {
     if (focus.zoom) {
       focus.zoom = false;
       const fi = all.findIndex(c => c.t === F.confT);
-      if (fi >= 0) lwc.timeScale().setVisibleLogicalRange({ from: Math.max(0, fi - 60), to: Math.min(all.length + 6, fi + 60) });
+      if (fi >= 0) lwc.timeScale().setVisibleLogicalRange({ from: Math.max(0, fi - 60), to: Math.min(all.length + 26, fi + 60) });
     }
   }
   while (lwSeg.length < segs.length) lwSeg.push(lwc.addLineSeries({ lineWidth: 1, lineStyle: 2, priceLineVisible: false, crosshairMarkerVisible: false }));
@@ -984,7 +1038,7 @@ function buildViewSel() {
   el.value = view;
   document.getElementById('viewChips').innerHTML = INSTR.map(i => i.id).concat('all').map(id => {
     const i = INSTR.find(x => x.id === id), m = CHIP[id] || CHIP.all;
-    return `<button class="chip" role="tab" data-v="${id}" style="--c:${m.c}" onclick="setView('${id}')"><span class="ic">${m.g}</span>`
+    return `<button class="chip" role="tab" data-v="${id}" style="--c:${m.c}" onclick="setView('${id}'); togglePicker(event, false)"><span class="ic">${m.g}</span>`
       + `<span class="nm"><b>${i ? i.name : 'All markets'}</b><small data-px="${id}">${i ? '—' : INSTR.length + ' pairs'}</small></span></button>`;
   }).join('');
   if (view !== 'all' && !selected.startsWith(view + '|')) selected = view + '|' + selected.split('|')[1];
@@ -994,20 +1048,53 @@ const CHIP = { XAU: { g: 'Au', c: '#e8c547' }, EUR: { g: '€', c: '#58a6ff' }, 
   BTC: { g: '₿', c: '#f7931a' }, SOL: { g: '◎', c: '#b98cff' }, all: { g: '◉', c: '#00d4ff' } };
 function chipPrices() {   // live mid price on each chip
   for (const i of INSTR) {
-    const e = document.querySelector(`[data-px="${i.id}"]`), l = live[i.id];
-    if (e && l && l.bid != null) e.textContent = ((l.bid + l.ask) / 2).toFixed(i.dp);
+    const l = live[i.id];
+    if (l && l.bid != null) document.querySelectorAll(`[data-px="${i.id}"]`).forEach(e => e.textContent = ((l.bid + l.ask) / 2).toFixed(i.dp));
   }
 }
 setInterval(chipPrices, 1000);
+function togglePicker(ev, open) {
+  if (ev) ev.stopPropagation();
+  const p = document.getElementById('picker');
+  p.classList.toggle('open', open != null ? open : !p.classList.contains('open'));
+}
+document.addEventListener('click', e => { const p = document.getElementById('picker'); if (p && !p.contains(e.target)) p.classList.remove('open'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') togglePicker(null, false); });
 function setView(v) {
   view = v; store.set('view', v);
   document.getElementById('viewSel').value = v;
   if (v !== 'all' && !selected.startsWith(v + '|')) select(v + '|' + selected.split('|')[1]);
   applyView();
 }
+let tfView = store.get('tfview', 'all');
+function tfDots() {   // a glowing dot on a tab when that timeframe has a live signal in the markets shown
+  for (const t of TFS) {
+    const d = document.querySelector(`#tfTabs [data-tf="${t.id}"] .dot`); if (!d) continue;
+    const cells = INSTR.filter(i => view === 'all' || i.id === view).map(i => document.getElementById(`c-${i.id}|${t.id}`)).filter(Boolean);
+    d.className = 'dot ' + (cells.some(c => c.classList.contains('hot-SELL')) ? 'SELL' : cells.some(c => c.classList.contains('hot-BUY')) ? 'BUY' : '');
+  }
+}
+function buildTfTabs() {
+  if (tfView !== 'all' && !TFS.some(t => t.id === tfView)) tfView = 'all';
+  document.getElementById('tfTabs').innerHTML = TFS.map(t => `<button class="tftab" data-tf="${t.id}" onclick="setTf('${t.id}')">${t.id.toUpperCase()}<span class="dot"></span></button>`).join('')
+    + '<button class="tftab" data-tf="all" onclick="setTf(\'all\')">ALL</button>';
+}
+function setTf(v) {
+  tfView = v; store.set('tfview', v);
+  if (v !== 'all' && selected.split('|')[1] !== v) select(selected.split('|')[0] + '|' + v);
+  applyView();
+}
 function applyView() {
+  if (!document.querySelector('#tfTabs .tftab')) buildTfTabs();
+  document.querySelectorAll('#tfTabs .tftab').forEach(b => b.classList.toggle('on', b.dataset.tf === tfView));
+  document.getElementById('grid').classList.toggle('one', tfView !== 'all');
+  document.getElementById('stage').classList.toggle('side', tfView !== 'all');
+  document.querySelectorAll('#grid .gh').forEach(e => e.style.display = tfView === 'all' || e.dataset.tf === tfView ? '' : 'none');
+  tfDots();
   document.querySelectorAll('#viewChips .chip').forEach(c => { const on = c.dataset.v === view; c.classList.toggle('on', on); c.setAttribute('aria-selected', on); });
-  document.querySelectorAll('#grid [data-instr]').forEach(e => e.style.display = view === 'all' || e.dataset.instr === view ? '' : 'none');
+  const cur = document.querySelector(`#viewChips .chip[data-v="${view}"]`), pb = document.getElementById('pickBtn');
+  if (cur && pb) { pb.style.cssText = cur.style.cssText; pb.innerHTML = cur.innerHTML + '<span class="caret">▼</span>'; chipPrices(); }
+  document.querySelectorAll('#grid [data-instr]').forEach(e => e.style.display = (view === 'all' || e.dataset.instr === view) && (tfView === 'all' || !e.dataset.tf || e.dataset.tf === tfView) ? '' : 'none');
   const others = INSTR.filter(i => i.id !== view).map(i => i.name);
   document.getElementById('viewNote').textContent = view === 'all' ? '' : `Alerts still run for ${others.join(' and ')} in the background.`;
   renderHistory();
