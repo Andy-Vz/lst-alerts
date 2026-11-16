@@ -41,6 +41,30 @@
   .viewbar select { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 30px 7px 10px; font: 600 14px "Segoe UI", system-ui, sans-serif; cursor: pointer; }
   .viewbar select:hover, .viewbar select:focus { border-color: var(--gold); outline: none; }
   .viewnote { color: var(--muted); font-size: 12px; }
+  /* futuristic market picker (Carlos, Nov 16 2026): neon chips instead of the plain drop-down */
+  .viewbar { flex-wrap: wrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px; border-radius: 11px; position: relative;
+    background: linear-gradient(135deg, rgba(0,212,255,.06), rgba(185,140,255,.06)); border: 1px solid rgba(0,212,255,.18);
+    box-shadow: inset 0 0 24px rgba(0,212,255,.05); }
+  .chip { --c: var(--entry); position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 9px 3px 3px;
+    border-radius: 8px; border: 1px solid var(--line); background: linear-gradient(160deg, #18202b, #0f141b); color: var(--text);
+    cursor: pointer; overflow: hidden; transition: transform .18s, border-color .18s, box-shadow .18s; font: inherit; text-align: left; }
+  .chip::before { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.07) 50%, transparent 70%);
+    transform: translateX(-120%); transition: transform .6s; pointer-events: none; }
+  .chip:hover { transform: translateY(-2px); border-color: var(--c); box-shadow: 0 6px 18px -8px var(--c); }
+  .chip:hover::before { transform: translateX(120%); }
+  .chip .ic { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-weight: 800; font-size: 10.5px;
+    color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); }
+  .chip .nm { display: flex; align-items: baseline; gap: 6px; line-height: 1.1; white-space: nowrap; }
+  .chip .nm b { font-size: 12px; letter-spacing: .3px; }
+  .chip .nm small { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; font-family: Consolas, "Cascadia Mono", monospace; }
+  .chip.on { border-color: var(--c); background: linear-gradient(160deg, color-mix(in srgb, var(--c) 16%, #18202b), #0f141b);
+    box-shadow: 0 0 0 1px var(--c) inset, 0 0 14px -4px var(--c); }
+  .chip.on .ic { background: var(--c); color: #061018; box-shadow: 0 0 8px var(--c); }
+  .chip.on::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: 0; height: 1.5px; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--c), transparent); animation: scan 2.4s linear infinite; }
+  @keyframes scan { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+  @media (max-width: 600px) { .chip { flex: 0 1 auto; } }
   .viewbar .staronly { margin-left: auto; color: var(--text); font-size: 13px; text-transform: none; letter-spacing: 0; cursor: pointer; display: flex; align-items: center; gap: 6px; }
   .staronly input { accent-color: var(--gold); width: 15px; height: 15px; cursor: pointer; }
   .grid { display: grid; grid-template-columns: 140px repeat(5, 1fr); gap: 8px; overflow-x: auto; }
@@ -129,7 +153,8 @@
 <main>
   <div class="viewbar">
     <label for="viewSel">Market</label>
-    <select id="viewSel" onchange="setView(this.value)"></select>
+    <select id="viewSel" onchange="setView(this.value)" hidden></select>
+    <div class="chips" id="viewChips" role="tablist" aria-label="Market"></div>
     <span class="viewnote" id="viewNote"></span>
     <label class="staronly" title="Only alert Fibonacci pullback signals. Note: on 5 years of real prices no setup had a reliable edge after costs"><input type="checkbox" id="starOnly" onchange="setStarOnly(this.checked)"> 🔔 Alert me only for ⭐ Fib signals</label>
   </div>
@@ -957,15 +982,31 @@ function buildViewSel() {
   el.innerHTML = INSTR.map(i => `<option value="${i.id}">${i.name}</option>`).join('') + '<option value="all">All markets</option>';
   if (view !== 'all' && !INSTR.some(i => i.id === view)) view = 'all';
   el.value = view;
+  document.getElementById('viewChips').innerHTML = INSTR.map(i => i.id).concat('all').map(id => {
+    const i = INSTR.find(x => x.id === id), m = CHIP[id] || CHIP.all;
+    return `<button class="chip" role="tab" data-v="${id}" style="--c:${m.c}" onclick="setView('${id}')"><span class="ic">${m.g}</span>`
+      + `<span class="nm"><b>${i ? i.name : 'All markets'}</b><small data-px="${id}">${i ? '—' : INSTR.length + ' pairs'}</small></span></button>`;
+  }).join('');
   if (view !== 'all' && !selected.startsWith(view + '|')) selected = view + '|' + selected.split('|')[1];
   applyView();
 }
+const CHIP = { XAU: { g: 'Au', c: '#e8c547' }, EUR: { g: '€', c: '#58a6ff' }, USD: { g: '$', c: '#2fbf71' },
+  BTC: { g: '₿', c: '#f7931a' }, SOL: { g: '◎', c: '#b98cff' }, all: { g: '◉', c: '#00d4ff' } };
+function chipPrices() {   // live mid price on each chip
+  for (const i of INSTR) {
+    const e = document.querySelector(`[data-px="${i.id}"]`), l = live[i.id];
+    if (e && l && l.bid != null) e.textContent = ((l.bid + l.ask) / 2).toFixed(i.dp);
+  }
+}
+setInterval(chipPrices, 1000);
 function setView(v) {
   view = v; store.set('view', v);
+  document.getElementById('viewSel').value = v;
   if (v !== 'all' && !selected.startsWith(v + '|')) select(v + '|' + selected.split('|')[1]);
   applyView();
 }
 function applyView() {
+  document.querySelectorAll('#viewChips .chip').forEach(c => { const on = c.dataset.v === view; c.classList.toggle('on', on); c.setAttribute('aria-selected', on); });
   document.querySelectorAll('#grid [data-instr]').forEach(e => e.style.display = view === 'all' || e.dataset.instr === view ? '' : 'none');
   const others = INSTR.filter(i => i.id !== view).map(i => i.name);
   document.getElementById('viewNote').textContent = view === 'all' ? '' : `Alerts still run for ${others.join(' and ')} in the background.`;
